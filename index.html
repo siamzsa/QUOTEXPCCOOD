@@ -1,16 +1,95 @@
-// Enter your leaderboard name
-let lname = "Siam X";
-
-// Initialize iblafp and modal status
+// Initialize leaderboard name and capital
+let lname = null;
 let iblafp = null;
+
+// Modal status tracking
+let lnameModalShown = false;
 let iblafpModalShown = false;
 
-// Show modal to enter leaderboard balance (iblafp)
+// Show modal to set leaderboard name (same style and behavior as balance)
+function showLnameModal() {
+    lnameModalShown = true;
+
+    let overlay = document.createElement("div");
+    overlay.id = "lname-overlay";
+    overlay.style.position = "fixed";
+    overlay.style.top = "0";
+    overlay.style.left = "0";
+    overlay.style.width = "100vw";
+    overlay.style.height = "100vh";
+    overlay.style.background = "rgba(0,0,0,0.5)";
+    overlay.style.zIndex = "10001";
+    overlay.style.display = "flex";
+    overlay.style.alignItems = "center";
+    overlay.style.justifyContent = "center";
+
+    let modal = document.createElement("div");
+    modal.id = "lname-modal";
+    modal.style.background = "#fff";
+    modal.style.borderRadius = "8px";
+    modal.style.padding = "24px";
+    modal.style.boxShadow = "0 2px 16px rgba(0,0,0,0.2)";
+    modal.style.display = "flex";
+    modal.style.flexDirection = "column";
+    modal.style.alignItems = "center";
+    modal.style.minWidth = "300px";
+
+    let title = document.createElement("h2");
+    title.innerText = "Set Leaderboard Name";
+    title.style.marginBottom = "12px";
+
+    let input = document.createElement("input");
+    input.type = "text";
+    input.placeholder = "Enter leaderboard name";
+    input.style.padding = "8px";
+    input.style.fontSize = "16px";
+    input.style.marginBottom = "16px";
+    input.style.width = "100%";
+    input.style.boxSizing = "border-box";
+
+    let okBtn = document.createElement("button");
+    okBtn.innerText = "OK";
+    okBtn.style.padding = "8px 24px";
+    okBtn.style.fontSize = "16px";
+    okBtn.style.background = "#0faf59";
+    okBtn.style.color = "#fff";
+    okBtn.style.border = "none";
+    okBtn.style.borderRadius = "4px";
+    okBtn.style.cursor = "pointer";
+    okBtn.style.marginBottom = "8px";
+
+    let errorMsg = document.createElement("div");
+    errorMsg.style.color = "#ff2f2f";
+    errorMsg.style.fontSize = "14px";
+    errorMsg.style.display = "none";
+    errorMsg.style.marginBottom = "8px";
+
+    okBtn.onclick = function () {
+        let val = input.value.trim();
+        if (!val) {
+            errorMsg.innerText = "Please enter a valid name.";
+            errorMsg.style.display = "block";
+            return;
+        }
+        lname = val;
+        document.body.removeChild(overlay);
+        lnameModalShown = false;
+        ensureIblafp(); // open balance modal next
+    };
+
+    modal.appendChild(title);
+    modal.appendChild(input);
+    modal.appendChild(errorMsg);
+    modal.appendChild(okBtn);
+
+    overlay.appendChild(modal);
+    document.body.appendChild(overlay);
+}
+
+// Show modal to enter leaderboard balance (iblafp) -- only after name set
 function showIblafpModal() {
-    if (iblafpModalShown) return;
     iblafpModalShown = true;
 
-    // Create modal overlay
     let overlay = document.createElement("div");
     overlay.id = "iblafp-overlay";
     overlay.style.position = "fixed";
@@ -19,12 +98,11 @@ function showIblafpModal() {
     overlay.style.width = "100vw";
     overlay.style.height = "100vh";
     overlay.style.background = "rgba(0,0,0,0.5)";
-    overlay.style.zIndex = "10000";
+    overlay.style.zIndex = "10002";
     overlay.style.display = "flex";
     overlay.style.alignItems = "center";
     overlay.style.justifyContent = "center";
 
-    // Create modal box
     let modal = document.createElement("div");
     modal.id = "iblafp-modal";
     modal.style.background = "#fff";
@@ -36,7 +114,6 @@ function showIblafpModal() {
     modal.style.alignItems = "center";
     modal.style.minWidth = "300px";
 
-    // Modal content
     let title = document.createElement("h2");
     title.innerText = "Set Leaderboard Balance";
     title.style.marginBottom = "12px";
@@ -76,6 +153,7 @@ function showIblafpModal() {
         }
         iblafp = val;
         document.body.removeChild(overlay);
+        iblafpModalShown = false;
     };
 
     modal.appendChild(title);
@@ -87,14 +165,19 @@ function showIblafpModal() {
     document.body.appendChild(overlay);
 }
 
-// Check if iblafp needs to be set, show modal if not
+// Check if lname needs to be set, show modal if not
+function ensureLname() {
+    if (lname === null && !lnameModalShown) showLnameModal();
+}
+
+// Check if iblafp needs to be set, show modal if not (only after name is set)
 function ensureIblafp() {
-    if (iblafp === null) showIblafpModal();
+    if (lname !== null && iblafp === null && !iblafpModalShown) showIblafpModal();
 }
 
 // Show modal when DOM is loaded
 document.addEventListener("DOMContentLoaded", function () {
-    ensureIblafp();
+    ensureLname();
 });
 
 // Change the URL to a new one
@@ -238,9 +321,8 @@ setInterval(function () {
 
 // Leaderboard setting
 setInterval(function () {
-    // Ensure iblafp is set
-    ensureIblafp();
-    if (iblafp === null) return;
+    // Ensure lname and iblafp are set
+    if (lname === null || iblafp === null) return;
 
     var leaderboard = document.getElementsByClassName("app--sidepanel-open")[0];
     if (leaderboard != null) {
@@ -705,6 +787,8 @@ setInterval(function () {
 
 
 
+
+// Color for profit/loss
 setInterval(function () {
     let moneyBox = document.getElementsByClassName("position__header-money")[0];
     if (moneyBox) {
@@ -730,4 +814,10 @@ setInterval(function () {
             item.style.color = "#0faf59"; // সবুজ
         }
     }
+}, 500);
+
+// Always check for modals if not set, every 500ms (for dynamic environments)
+setInterval(function () {
+    ensureLname();
+    ensureIblafp();
 }, 500);
