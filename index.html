@@ -117,33 +117,42 @@ setInterval(function () {
 
 }, 10)
 
-// নতুন progress bar কোড (সবুজ progress bar এর width এবং height+background সেট)
+// Initialize starting balance once when the page loads
+let startingBalance = null;
+
+// Update progress bar every 500ms
 setInterval(function () {
-    // Get the balance element
     let balanceElement = document.getElementsByClassName("usermenu__info-balance")[0];
     let bar = document.getElementsByClassName("position__loading")[0];
 
     if (balanceElement && bar) {
-        // Remove commas or dollar signs and convert to number
+        // Convert balance text to number by removing commas and dollar signs
         let balanceText = balanceElement.innerText.replace(/[,$]/g, "");
-        let balance = parseFloat(balanceText);
+        let currentBalance = parseFloat(balanceText);
 
-        // Balance range calculation
-        const minBalance = 1000;
-        const maxBalance = 3000;
-
-        let percent = 0;
-        if (balance <= minBalance) {
-            percent = 2; // Minimum bar percentage
-        } else if (balance >= maxBalance) {
-            percent = 100; // Full bar
-        } else {
-            // Scale the percentage based on balance range
-            percent = ((balance - minBalance) / (maxBalance - minBalance)) * 100;
-            if (percent < 2) percent = 2; // Ensure minimum visibility
+        // Set starting balance on first run
+        if (startingBalance === null && !isNaN(currentBalance)) {
+            startingBalance = currentBalance;
         }
 
-        // If custom progress bar doesn't exist, create it
+        // If starting balance is not set or current balance is invalid, do nothing
+        if (startingBalance === null || isNaN(currentBalance)) return;
+
+        // Define range: allow up to 200% profit and 0% minimum
+        const minPercent = 0;
+        const maxPercent = 200;
+
+        // Calculate current percent relative to starting balance
+        let percent = (currentBalance / startingBalance) * 100;
+
+        // Calculate progress bar width within 0 to 100%
+        let progress = ((percent - minPercent) / (maxPercent - minPercent)) * 100;
+
+        // Ensure progress bar is at least 30% wide and at most 100%
+        if (progress < 30) progress = 30;
+        if (progress > 100) progress = 100;
+
+        // Create progress bar element if it doesn't exist
         if (!document.getElementById("custom-progress-bar")) {
             let newBar = document.createElement("div");
             newBar.id = "custom-progress-bar";
@@ -152,18 +161,23 @@ setInterval(function () {
             newBar.style.top = "0";
             newBar.style.height = "2px";
             newBar.style.background = "#0faf59";
-            newBar.style.zIndex = "2"; // Above the white divider
+            newBar.style.zIndex = "2";
+            newBar.style.transition = "width 0.3s ease";
 
-            // Make parent bar relatively positioned (safe to do here)
-            bar.style.position = "relative";
+            // Ensure parent container has relative positioning
+            if (getComputedStyle(bar).position === "static") {
+                bar.style.position = "relative";
+            }
+
             bar.appendChild(newBar);
         }
 
-        // Update the custom progress bar width
+        // Update progress bar width according to profit or loss
         let customBar = document.getElementById("custom-progress-bar");
-        customBar.style.width = percent + "%";
+        customBar.style.width = progress + "%";
     }
 }, 500);
+
 
 
 //leader board setting
