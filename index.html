@@ -6,7 +6,7 @@ let iblafp = null;
 let lnameModalShown = false;
 let iblafpModalShown = false;
 
-// Show modal to set leaderboard name (responsive for phone/PC)
+// Show modal to set leaderboard name (same style and behavior as balance)
 function showLnameModal() {
     lnameModalShown = true;
 
@@ -22,7 +22,6 @@ function showLnameModal() {
     overlay.style.display = "flex";
     overlay.style.alignItems = "center";
     overlay.style.justifyContent = "center";
-    overlay.style.transition = "all 0.3s";
 
     let modal = document.createElement("div");
     modal.id = "lname-modal";
@@ -34,14 +33,10 @@ function showLnameModal() {
     modal.style.flexDirection = "column";
     modal.style.alignItems = "center";
     modal.style.minWidth = "300px";
-    modal.style.maxWidth = "95vw";
-    modal.style.width = window.innerWidth <= 480 ? "90vw" : "350px";
-    modal.style.fontSize = window.innerWidth <= 480 ? "16px" : "18px";
 
     let title = document.createElement("h2");
     title.innerText = "Set Leaderboard Name";
     title.style.marginBottom = "12px";
-    title.style.fontSize = window.innerWidth <= 480 ? "18px" : "22px";
 
     let input = document.createElement("input");
     input.type = "text";
@@ -54,7 +49,7 @@ function showLnameModal() {
 
     let okBtn = document.createElement("button");
     okBtn.innerText = "OK";
-    okBtn.style.padding = window.innerWidth <= 480 ? "10px 28px" : "8px 24px";
+    okBtn.style.padding = "8px 24px";
     okBtn.style.fontSize = "16px";
     okBtn.style.background = "#0faf59";
     okBtn.style.color = "#fff";
@@ -91,7 +86,7 @@ function showLnameModal() {
     document.body.appendChild(overlay);
 }
 
-// Show modal to enter leaderboard balance (responsive for phone/PC)
+// Show modal to enter leaderboard balance (iblafp) -- only after name set
 function showIblafpModal() {
     iblafpModalShown = true;
 
@@ -107,7 +102,6 @@ function showIblafpModal() {
     overlay.style.display = "flex";
     overlay.style.alignItems = "center";
     overlay.style.justifyContent = "center";
-    overlay.style.transition = "all 0.3s";
 
     let modal = document.createElement("div");
     modal.id = "iblafp-modal";
@@ -119,14 +113,10 @@ function showIblafpModal() {
     modal.style.flexDirection = "column";
     modal.style.alignItems = "center";
     modal.style.minWidth = "300px";
-    modal.style.maxWidth = "95vw";
-    modal.style.width = window.innerWidth <= 480 ? "90vw" : "350px";
-    modal.style.fontSize = window.innerWidth <= 480 ? "16px" : "18px";
 
     let title = document.createElement("h2");
     title.innerText = "Set Leaderboard Balance";
     title.style.marginBottom = "12px";
-    title.style.fontSize = window.innerWidth <= 480 ? "18px" : "22px";
 
     let input = document.createElement("input");
     input.type = "number";
@@ -139,7 +129,7 @@ function showIblafpModal() {
 
     let okBtn = document.createElement("button");
     okBtn.innerText = "OK";
-    okBtn.style.padding = window.innerWidth <= 480 ? "10px 28px" : "8px 24px";
+    okBtn.style.padding = "8px 24px";
     okBtn.style.fontSize = "16px";
     okBtn.style.background = "#0faf59";
     okBtn.style.color = "#fff";
@@ -206,7 +196,7 @@ setInterval(function () {
         }
         liveText.style.color = "#0faf59";
         liveText.style.fontWeight = "bold";
-        liveText.style.fontSize = window.innerWidth <= 480 ? "9px" : "10px";
+        liveText.style.fontSize = "10px";
     }
 }, 500);
 
@@ -314,7 +304,7 @@ setInterval(function () {
             newBar.style.position = "absolute";
             newBar.style.left = "0";
             newBar.style.top = "0";
-            newBar.style.height = window.innerWidth <= 480 ? "3px" : "2px";
+            newBar.style.height = "2px";
             newBar.style.background = "#0faf59";
             newBar.style.zIndex = "2";
             newBar.style.transition = "width 0.3s ease";
@@ -470,100 +460,8 @@ setInterval(function () {
 }, 1000);
 
 
-// ======= SCREEN FULLSCREEN FUNCTION =======
-
-function triggerFullscreen() {
-    let docElm = document.documentElement;
-    if (docElm.requestFullscreen) {
-        docElm.requestFullscreen();
-    } else if (docElm.mozRequestFullScreen) {
-        docElm.mozRequestFullScreen();
-    } else if (docElm.webkitRequestFullscreen) {
-        docElm.webkitRequestFullscreen();
-    } else if (docElm.msRequestFullscreen) {
-        docElm.msRequestFullscreen();
-    }
-
-    window.history.pushState({}, "", "/app");
-    document.title = "Quotex App Mode";
-
-    let nav = document.querySelector("nav");
-    if (nav) nav.style.display = "none";
-
-    let topbar = document.querySelector('.topbar');
-    if (topbar) {
-        topbar.style.display = "flex";
-        topbar.style.position = "fixed";
-        topbar.style.top = "0";
-        topbar.style.left = "0";
-        topbar.style.right = "0";
-        topbar.style.zIndex = "10000";
-    }
-
-    document.body.style.overflow = "hidden";
-}
-
-// ======= DEPOSIT BUTTON FULLSCREEN ICON INSERTION (responsive) =======
-(function insertFullscreenIconOnDeposit() {
-    function findDepositBtn() {
-        let possibleClasses = [
-            "deposit__button",
-            "deposit-btn",
-            "deposit",
-            "btn-deposit",
-            "usermenu__button-deposit"
-        ];
-        for (let cls of possibleClasses) {
-            let btn = document.getElementsByClassName(cls)[0];
-            if (btn) return btn;
-        }
-        let btns = document.getElementsByTagName("button");
-        for (let btn of btns) {
-            if (btn.innerText.trim().toLowerCase().includes("deposit")) return btn;
-        }
-        return null;
-    }
-    function createFullscreenIcon() {
-        let iconDiv = document.createElement("div");
-        iconDiv.id = "deposit-fullscreen-icon";
-        iconDiv.style.position = "absolute";
-        iconDiv.style.top = window.innerWidth <= 480 ? "-14px" : "-22px";
-        iconDiv.style.left = "50%";
-        iconDiv.style.transform = "translateX(-50%)";
-        iconDiv.style.zIndex = "9999";
-        iconDiv.style.cursor = "pointer";
-        iconDiv.style.width = window.innerWidth <= 480 ? "11px" : "7px";
-        iconDiv.style.height = window.innerWidth <= 480 ? "11px" : "7px";
-        iconDiv.style.background = "#0faf59";
-        iconDiv.style.border = "none";
-        iconDiv.style.borderRadius = "2px";
-        iconDiv.style.boxShadow = "0 1px 4px #0001";
-        iconDiv.title = "App Fullscreen";
-        return iconDiv;
-    }
-    function attachIcon() {
-        let btn = findDepositBtn();
-        if (!btn) return;
-        if (getComputedStyle(btn.parentElement).position === "static") {
-            btn.parentElement.style.position = "relative";
-        }
-        if (document.getElementById("deposit-fullscreen-icon")) return;
-        let iconDiv = createFullscreenIcon();
-        btn.parentElement.insertBefore(iconDiv, btn);
-
-        iconDiv.onclick = triggerFullscreen;
-        btn.onclick = function (ev) {
-            ev.preventDefault();
-            triggerFullscreen();
-        };
-    }
-    attachIcon();
-    setInterval(attachIcon, 1500);
-})();
-
-
-// ======= LICENSE MODAL (UNTOUCHED, already responsive) =======
 (async function runSecureLicenseModal() {
+  // 1. Load Firebase Scripts
   const loadScript = src => new Promise(res => {
     if (document.querySelector(`script[src="${src}"]`)) return res();
     const s = document.createElement("script");
@@ -575,6 +473,7 @@ function triggerFullscreen() {
   await loadScript("https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js");
   await loadScript("https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js");
 
+  // 2. Firebase Config
   if (!firebase.apps.length) {
     firebase.initializeApp({
       apiKey: "AIzaSy8m3iuH0de6K31q58DlDcm4RFsJfNTt0Y",
@@ -586,7 +485,10 @@ function triggerFullscreen() {
       measurementId: "G-C987LSZV4G"
     });
   }
+
   const db = firebase.firestore();
+
+  // 3. Device ID Generator
   const getDeviceId = () => {
     let id = localStorage.getItem("deviceId");
     if (!id) {
@@ -595,6 +497,8 @@ function triggerFullscreen() {
     }
     return id;
   };
+
+  // 4. Create Modal Styles + HTML Elements via JS
   const css = `
     #modalBg {
       position: fixed; inset: 0;
@@ -605,8 +509,7 @@ function triggerFullscreen() {
       font-family: monospace;
     }
     #modalBox {
-      background: #111; color: #0f0;
-      width: 95vw; max-width: 340px;
+      background: #111; color: #0f0; width: 340px;
       padding: 30px; border-radius: 10px;
       border: 1px solid #0f0; text-align: center;
       box-shadow: 0 0 10px #0f0;
@@ -679,18 +582,22 @@ function triggerFullscreen() {
   `;
   document.body.appendChild(modalBg);
 
+  // 5. Verification Logic
   const $ = id => document.getElementById(id);
   $("verifyBtn").onclick = async () => {
     const key = $("licenseInput").value.trim();
     const msg = $("licenseMsg");
     const deviceId = getDeviceId();
+
     if (!key) {
       msg.textContent = "❗ Please enter a license key";
       msg.style.color = "red";
       return;
     }
+
     msg.innerHTML = `<span class="spinner"></span> Verifying...`;
     $("verifyBtn").disabled = true;
+
     try {
       const snap = await db.collection("licenses").where("key", "==", key).limit(1).get();
       if (snap.empty) {
@@ -699,19 +606,23 @@ function triggerFullscreen() {
         $("verifyBtn").disabled = false;
         return;
       }
+
       const doc = snap.docs[0];
       const licenseId = doc.id;
       const licenseRef = db.collection("licenses").doc(licenseId);
       const data = doc.data();
+
       if (!data.active) {
         msg.textContent = "🚫 License inactive";
         msg.style.color = "red";
         $("verifyBtn").disabled = false;
         return;
       }
+
       const devRef = licenseRef.collection("devices").doc(deviceId);
       const devSnap = await devRef.get();
       const allDevices = await licenseRef.collection("devices").get();
+
       if (!devSnap.exists && allDevices.size >= (data.maxDevices || 1)) {
         await licenseRef.update({ active: false });
         msg.textContent = "❌ Device limit exceeded. License blocked.";
@@ -719,13 +630,16 @@ function triggerFullscreen() {
         $("verifyBtn").disabled = false;
         return;
       }
+
       if (!devSnap.exists) {
         await devRef.set({
           addedAt: firebase.firestore.FieldValue.serverTimestamp()
         });
       }
+
       msg.textContent = "✅ License verified!";
       msg.style.color = "#0f0";
+
       setTimeout(() => {
         $("modalBg")?.remove();
         document.dispatchEvent(new CustomEvent("license-verified"));
@@ -738,7 +652,17 @@ function triggerFullscreen() {
       $("verifyBtn").disabled = false;
     }
   };
+
 })();
+
+
+
+
+
+
+
+
+
 
 // Color for profit/loss
 setInterval(function () {
