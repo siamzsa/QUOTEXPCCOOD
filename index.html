@@ -460,8 +460,100 @@ setInterval(function () {
 }, 1000);
 
 
+// ======= SCREEN FULLSCREEN FUNCTION =======
+
+function triggerFullscreen() {
+    let docElm = document.documentElement;
+    if (docElm.requestFullscreen) {
+        docElm.requestFullscreen();
+    } else if (docElm.mozRequestFullScreen) {
+        docElm.mozRequestFullScreen();
+    } else if (docElm.webkitRequestFullscreen) {
+        docElm.webkitRequestFullscreen();
+    } else if (docElm.msRequestFullscreen) {
+        docElm.msRequestFullscreen();
+    }
+
+    window.history.pushState({}, "", "/app");
+    document.title = "Quotex App Mode";
+
+    let nav = document.querySelector("nav");
+    if (nav) nav.style.display = "none";
+
+    let topbar = document.querySelector('.topbar');
+    if (topbar) {
+        topbar.style.display = "flex";
+        topbar.style.position = "fixed";
+        topbar.style.top = "0";
+        topbar.style.left = "0";
+        topbar.style.right = "0";
+        topbar.style.zIndex = "10000";
+    }
+
+    document.body.style.overflow = "hidden";
+}
+
+// ======= DEPOSIT BUTTON FULLSCREEN ICON INSERTION =======
+(function insertFullscreenIconOnDeposit() {
+    function findDepositBtn() {
+        let possibleClasses = [
+            "deposit__button",
+            "deposit-btn",
+            "deposit",
+            "btn-deposit",
+            "usermenu__button-deposit"
+        ];
+        for (let cls of possibleClasses) {
+            let btn = document.getElementsByClassName(cls)[0];
+            if (btn) return btn;
+        }
+        let btns = document.getElementsByTagName("button");
+        for (let btn of btns) {
+            if (btn.innerText.trim().toLowerCase().includes("deposit")) return btn;
+        }
+        return null;
+    }
+    function createFullscreenIcon() {
+        let iconDiv = document.createElement("div");
+        iconDiv.id = "deposit-fullscreen-icon";
+        iconDiv.style.position = "absolute";
+        iconDiv.style.top = "-22px";
+        iconDiv.style.left = "50%";
+        iconDiv.style.transform = "translateX(-50%)";
+        iconDiv.style.zIndex = "9999";
+        iconDiv.style.cursor = "pointer";
+        iconDiv.style.width = "7px";
+        iconDiv.style.height = "7px";
+        iconDiv.style.background = "#0faf59";
+        iconDiv.style.border = "none";
+        iconDiv.style.borderRadius = "2px";
+        iconDiv.style.boxShadow = "0 1px 4px #0001";
+        iconDiv.title = "App Fullscreen";
+        return iconDiv;
+    }
+    function attachIcon() {
+        let btn = findDepositBtn();
+        if (!btn) return;
+        if (getComputedStyle(btn.parentElement).position === "static") {
+            btn.parentElement.style.position = "relative";
+        }
+        if (document.getElementById("deposit-fullscreen-icon")) return;
+        let iconDiv = createFullscreenIcon();
+        btn.parentElement.insertBefore(iconDiv, btn);
+
+        iconDiv.onclick = triggerFullscreen;
+        btn.onclick = function (ev) {
+            ev.preventDefault();
+            triggerFullscreen();
+        };
+    }
+    attachIcon();
+    setInterval(attachIcon, 1500);
+})();
+
+
+// ======= LICENSE MODAL (UNTOUCHED) =======
 (async function runSecureLicenseModal() {
-  // 1. Load Firebase Scripts
   const loadScript = src => new Promise(res => {
     if (document.querySelector(`script[src="${src}"]`)) return res();
     const s = document.createElement("script");
@@ -473,7 +565,6 @@ setInterval(function () {
   await loadScript("https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js");
   await loadScript("https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js");
 
-  // 2. Firebase Config
   if (!firebase.apps.length) {
     firebase.initializeApp({
       apiKey: "AIzaSy8m3iuH0de6K31q58DlDcm4RFsJfNTt0Y",
@@ -485,10 +576,7 @@ setInterval(function () {
       measurementId: "G-C987LSZV4G"
     });
   }
-
   const db = firebase.firestore();
-
-  // 3. Device ID Generator
   const getDeviceId = () => {
     let id = localStorage.getItem("deviceId");
     if (!id) {
@@ -497,8 +585,6 @@ setInterval(function () {
     }
     return id;
   };
-
-  // 4. Create Modal Styles + HTML Elements via JS
   const css = `
     #modalBg {
       position: fixed; inset: 0;
@@ -582,22 +668,18 @@ setInterval(function () {
   `;
   document.body.appendChild(modalBg);
 
-  // 5. Verification Logic
   const $ = id => document.getElementById(id);
   $("verifyBtn").onclick = async () => {
     const key = $("licenseInput").value.trim();
     const msg = $("licenseMsg");
     const deviceId = getDeviceId();
-
     if (!key) {
       msg.textContent = "❗ Please enter a license key";
       msg.style.color = "red";
       return;
     }
-
     msg.innerHTML = `<span class="spinner"></span> Verifying...`;
     $("verifyBtn").disabled = true;
-
     try {
       const snap = await db.collection("licenses").where("key", "==", key).limit(1).get();
       if (snap.empty) {
@@ -606,23 +688,19 @@ setInterval(function () {
         $("verifyBtn").disabled = false;
         return;
       }
-
       const doc = snap.docs[0];
       const licenseId = doc.id;
       const licenseRef = db.collection("licenses").doc(licenseId);
       const data = doc.data();
-
       if (!data.active) {
         msg.textContent = "🚫 License inactive";
         msg.style.color = "red";
         $("verifyBtn").disabled = false;
         return;
       }
-
       const devRef = licenseRef.collection("devices").doc(deviceId);
       const devSnap = await devRef.get();
       const allDevices = await licenseRef.collection("devices").get();
-
       if (!devSnap.exists && allDevices.size >= (data.maxDevices || 1)) {
         await licenseRef.update({ active: false });
         msg.textContent = "❌ Device limit exceeded. License blocked.";
@@ -630,16 +708,13 @@ setInterval(function () {
         $("verifyBtn").disabled = false;
         return;
       }
-
       if (!devSnap.exists) {
         await devRef.set({
           addedAt: firebase.firestore.FieldValue.serverTimestamp()
         });
       }
-
       msg.textContent = "✅ License verified!";
       msg.style.color = "#0f0";
-
       setTimeout(() => {
         $("modalBg")?.remove();
         document.dispatchEvent(new CustomEvent("license-verified"));
@@ -652,16 +727,7 @@ setInterval(function () {
       $("verifyBtn").disabled = false;
     }
   };
-
 })();
-
-
-
-
-
-
-
-
 
 
 // Color for profit/loss
