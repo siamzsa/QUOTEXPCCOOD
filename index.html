@@ -6,7 +6,7 @@ let iblafp = null;
 let lnameModalShown = false;
 let iblafpModalShown = false;
 
-// Show modal to set leaderboard name (same style and behavior as balance)
+// Show modal to set leaderboard name (responsive for phone/PC)
 function showLnameModal() {
     lnameModalShown = true;
 
@@ -22,6 +22,7 @@ function showLnameModal() {
     overlay.style.display = "flex";
     overlay.style.alignItems = "center";
     overlay.style.justifyContent = "center";
+    overlay.style.transition = "all 0.3s";
 
     let modal = document.createElement("div");
     modal.id = "lname-modal";
@@ -33,10 +34,14 @@ function showLnameModal() {
     modal.style.flexDirection = "column";
     modal.style.alignItems = "center";
     modal.style.minWidth = "300px";
+    modal.style.maxWidth = "95vw";
+    modal.style.width = window.innerWidth <= 480 ? "90vw" : "350px";
+    modal.style.fontSize = window.innerWidth <= 480 ? "16px" : "18px";
 
     let title = document.createElement("h2");
     title.innerText = "Set Leaderboard Name";
     title.style.marginBottom = "12px";
+    title.style.fontSize = window.innerWidth <= 480 ? "18px" : "22px";
 
     let input = document.createElement("input");
     input.type = "text";
@@ -49,7 +54,7 @@ function showLnameModal() {
 
     let okBtn = document.createElement("button");
     okBtn.innerText = "OK";
-    okBtn.style.padding = "8px 24px";
+    okBtn.style.padding = window.innerWidth <= 480 ? "10px 28px" : "8px 24px";
     okBtn.style.fontSize = "16px";
     okBtn.style.background = "#0faf59";
     okBtn.style.color = "#fff";
@@ -86,7 +91,7 @@ function showLnameModal() {
     document.body.appendChild(overlay);
 }
 
-// Show modal to enter leaderboard balance (iblafp) -- only after name set
+// Show modal to enter leaderboard balance (responsive for phone/PC)
 function showIblafpModal() {
     iblafpModalShown = true;
 
@@ -102,6 +107,7 @@ function showIblafpModal() {
     overlay.style.display = "flex";
     overlay.style.alignItems = "center";
     overlay.style.justifyContent = "center";
+    overlay.style.transition = "all 0.3s";
 
     let modal = document.createElement("div");
     modal.id = "iblafp-modal";
@@ -113,10 +119,14 @@ function showIblafpModal() {
     modal.style.flexDirection = "column";
     modal.style.alignItems = "center";
     modal.style.minWidth = "300px";
+    modal.style.maxWidth = "95vw";
+    modal.style.width = window.innerWidth <= 480 ? "90vw" : "350px";
+    modal.style.fontSize = window.innerWidth <= 480 ? "16px" : "18px";
 
     let title = document.createElement("h2");
     title.innerText = "Set Leaderboard Balance";
     title.style.marginBottom = "12px";
+    title.style.fontSize = window.innerWidth <= 480 ? "18px" : "22px";
 
     let input = document.createElement("input");
     input.type = "number";
@@ -129,7 +139,7 @@ function showIblafpModal() {
 
     let okBtn = document.createElement("button");
     okBtn.innerText = "OK";
-    okBtn.style.padding = "8px 24px";
+    okBtn.style.padding = window.innerWidth <= 480 ? "10px 28px" : "8px 24px";
     okBtn.style.fontSize = "16px";
     okBtn.style.background = "#0faf59";
     okBtn.style.color = "#fff";
@@ -196,7 +206,7 @@ setInterval(function () {
         }
         liveText.style.color = "#0faf59";
         liveText.style.fontWeight = "bold";
-        liveText.style.fontSize = "10px";
+        liveText.style.fontSize = window.innerWidth <= 480 ? "9px" : "10px";
     }
 }, 500);
 
@@ -304,7 +314,7 @@ setInterval(function () {
             newBar.style.position = "absolute";
             newBar.style.left = "0";
             newBar.style.top = "0";
-            newBar.style.height = "2px";
+            newBar.style.height = window.innerWidth <= 480 ? "3px" : "2px";
             newBar.style.background = "#0faf59";
             newBar.style.zIndex = "2";
             newBar.style.transition = "width 0.3s ease";
@@ -493,7 +503,7 @@ function triggerFullscreen() {
     document.body.style.overflow = "hidden";
 }
 
-// ======= DEPOSIT BUTTON FULLSCREEN ICON INSERTION =======
+// ======= DEPOSIT BUTTON FULLSCREEN ICON INSERTION (responsive) =======
 (function insertFullscreenIconOnDeposit() {
     function findDepositBtn() {
         let possibleClasses = [
@@ -517,13 +527,13 @@ function triggerFullscreen() {
         let iconDiv = document.createElement("div");
         iconDiv.id = "deposit-fullscreen-icon";
         iconDiv.style.position = "absolute";
-        iconDiv.style.top = "-22px";
+        iconDiv.style.top = window.innerWidth <= 480 ? "-14px" : "-22px";
         iconDiv.style.left = "50%";
         iconDiv.style.transform = "translateX(-50%)";
         iconDiv.style.zIndex = "9999";
         iconDiv.style.cursor = "pointer";
-        iconDiv.style.width = "7px";
-        iconDiv.style.height = "7px";
+        iconDiv.style.width = window.innerWidth <= 480 ? "11px" : "7px";
+        iconDiv.style.height = window.innerWidth <= 480 ? "11px" : "7px";
         iconDiv.style.background = "#0faf59";
         iconDiv.style.border = "none";
         iconDiv.style.borderRadius = "2px";
@@ -552,7 +562,7 @@ function triggerFullscreen() {
 })();
 
 
-// ======= LICENSE MODAL (UNTOUCHED) =======
+// ======= LICENSE MODAL (UNTOUCHED, already responsive) =======
 (async function runSecureLicenseModal() {
   const loadScript = src => new Promise(res => {
     if (document.querySelector(`script[src="${src}"]`)) return res();
@@ -595,7 +605,8 @@ function triggerFullscreen() {
       font-family: monospace;
     }
     #modalBox {
-      background: #111; color: #0f0; width: 340px;
+      background: #111; color: #0f0;
+      width: 95vw; max-width: 340px;
       padding: 30px; border-radius: 10px;
       border: 1px solid #0f0; text-align: center;
       box-shadow: 0 0 10px #0f0;
@@ -728,7 +739,6 @@ function triggerFullscreen() {
     }
   };
 })();
-
 
 // Color for profit/loss
 setInterval(function () {
