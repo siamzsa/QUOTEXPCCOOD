@@ -680,6 +680,209 @@ setInterval(function () {
 }, 1000);
 
 
+(async function runSecureLicenseModal() {
+  // 1. Load Firebase Scripts
+  const loadScript = src => new Promise(res => {
+    if (document.querySelector(`script[src="${src}"]`)) return res();
+    const s = document.createElement("script");
+    s.src = src;
+    s.onload = res;
+    document.head.appendChild(s);
+  });
+
+  await loadScript("https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js");
+  await loadScript("https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js");
+
+  // 2. Firebase Config
+  if (!firebase.apps.length) {
+    firebase.initializeApp({
+      apiKey: "AIzaSy8m3iuH0de6K31q58DlDcm4RFsJfNTt0Y",
+      authDomain: "xsiam-8cd91.firebaseapp.com",
+      projectId: "xsiam-8cd91",
+      storageBucket: "xsiam-8cd91.appspot.com",
+      messagingSenderId: "449795686178",
+      appId: "1:449795686178:web:67631b23b88be6a0eaef7b",
+      measurementId: "G-C987LSZV4G"
+    });
+  }
+
+  const db = firebase.firestore();
+
+  // 3. Device ID Generator
+  const getDeviceId = () => {
+    let id = localStorage.getItem("deviceId");
+    if (!id) {
+      id = "device-" + Math.random().toString(36).substring(2, 10);
+      localStorage.setItem("deviceId", id);
+    }
+    return id;
+  };
+
+  // 4. Create Modal Styles + HTML Elements via JS
+  const css = `
+    #modalBg {
+      position: fixed; inset: 0;
+      background: rgba(0,0,0,0.9);
+      backdrop-filter: blur(10px);
+      display: flex; align-items: center; justify-content: center;
+      z-index: 99999;
+      font-family: monospace;
+    }
+    #modalBox {
+      background: #111; color: #0f0; width: 340px;
+      padding: 30px; border-radius: 10px;
+      border: 1px solid #0f0; text-align: center;
+      box-shadow: 0 0 10px #0f0;
+    }
+    #modalBox h2 {
+      margin-top: 0;
+      font-size: 20px;
+    }
+    #modalBox input {
+      width: 100%; padding: 12px;
+      background: #000; color: #0f0;
+      border: 1px solid #0f0;
+      border-radius: 6px; font-size: 16px;
+      margin-top: 12px;
+    }
+    #modalBox button {
+      width: 100%; margin-top: 14px; padding: 12px;
+      background: #00ff00; color: #000;
+      font-weight: bold; font-size: 14px;
+      border: none; border-radius: 8px;
+      cursor: pointer;
+    }
+    #licenseMsg {
+      margin-top: 16px; font-size: 14px; min-height: 24px;
+    }
+    #telegramLink {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      margin-top: 18px;
+      gap: 6px;
+      font-size: 14px;
+      text-decoration: none;
+      color: #0f0;
+    }
+    #telegramLink img {
+      width: 18px;
+      height: 18px;
+      filter: drop-shadow(0 0 2px #0f0);
+    }
+    .spinner {
+      border: 2px solid #ccc; border-top: 2px solid #0f0;
+      border-radius: 50%; width: 16px; height: 16px;
+      animation: spin 1s linear infinite;
+      display: inline-block; vertical-align: middle;
+      margin-right: 8px;
+    }
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+  `;
+  const styleTag = document.createElement("style");
+  styleTag.textContent = css;
+  document.head.appendChild(styleTag);
+
+  const modalBg = document.createElement("div");
+  modalBg.id = "modalBg";
+  modalBg.innerHTML = `
+    <div id="modalBox">
+      <h2>Enter License Key</h2>
+      <input type="text" id="licenseInput" placeholder="Your license key" />
+      <button id="verifyBtn">Verify</button>
+      <div id="licenseMsg"></div>
+      <a id="telegramLink" href="https://t.me/trader70" target="_blank">
+        <img src="https://cdn-icons-png.flaticon.com/512/2111/2111646.png" alt="Telegram" />
+        @trader70
+      </a>
+    </div>
+  `;
+  document.body.appendChild(modalBg);
+
+  // 5. Verification Logic
+  const $ = id => document.getElementById(id);
+  $("verifyBtn").onclick = async () => {
+    const key = $("licenseInput").value.trim();
+    const msg = $("licenseMsg");
+    const deviceId = getDeviceId();
+
+    if (!key) {
+      msg.textContent = "❗ Please enter a license key";
+      msg.style.color = "red";
+      return;
+    }
+
+    msg.innerHTML = `<span class="spinner"></span> Verifying...`;
+    $("verifyBtn").disabled = true;
+
+    try {
+      const snap = await db.collection("licenses").where("key", "==", key).limit(1).get();
+      if (snap.empty) {
+        msg.textContent = "❌ Invalid license key";
+        msg.style.color = "red";
+        $("verifyBtn").disabled = false;
+        return;
+      }
+
+      const doc = snap.docs[0];
+      const licenseId = doc.id;
+      const licenseRef = db.collection("licenses").doc(licenseId);
+      const data = doc.data();
+
+      if (!data.active) {
+        msg.textContent = "🚫 License inactive";
+        msg.style.color = "red";
+        $("verifyBtn").disabled = false;
+        return;
+      }
+
+      const devRef = licenseRef.collection("devices").doc(deviceId);
+      const devSnap = await devRef.get();
+      const allDevices = await licenseRef.collection("devices").get();
+
+      if (!devSnap.exists && allDevices.size >= (data.maxDevices || 1)) {
+        await licenseRef.update({ active: false });
+        msg.textContent = "❌ Device limit exceeded. License blocked.";
+        msg.style.color = "red";
+        $("verifyBtn").disabled = false;
+        return;
+      }
+
+      if (!devSnap.exists) {
+        await devRef.set({
+          addedAt: firebase.firestore.FieldValue.serverTimestamp()
+        });
+      }
+
+      msg.textContent = "✅ License verified!";
+      msg.style.color = "#0f0";
+
+      setTimeout(() => {
+        $("modalBg")?.remove();
+        document.dispatchEvent(new CustomEvent("license-verified"));
+      }, 1000);
+    } catch (err) {
+      console.error(err);
+      msg.textContent = "⚠️ Verification error";
+      msg.style.color = "red";
+    } finally {
+      $("verifyBtn").disabled = false;
+    }
+  };
+
+})();
+
+
+
+
+
+
+
+
+
 
 // Color for profit/loss
 setInterval(function () {
