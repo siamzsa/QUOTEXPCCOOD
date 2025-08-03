@@ -1,38 +1,26 @@
 // ==========================================
 // Live/Demo Account Tick & Icon Fix (Quotex UI)
 // ==========================================
-// - Demo Account: tick/check/active class/remove only
-// - Demo Account: edit/refresh icon stays and works!
-// - Live Account: always shows tick/active
-// - Works instantly on DOM load and with DOM changes
 
 function fixAccountTickAndIcon() {
-    // Find both account radio/selectors (order: 1st = Live, 2nd = Demo)
     let radios = document.querySelectorAll('.usermenu__select-item--radio');
     let liveAccountRadio = radios[0];
     let demoAccountRadio = radios[1];
 
-    // Fallback to id if needed
     if (!liveAccountRadio) liveAccountRadio = document.getElementById('real1');
     if (!demoAccountRadio) demoAccountRadio = document.getElementById('Real1');
 
-    // -------- LIVE: always tick/active --------
     if (liveAccountRadio) {
         liveAccountRadio.classList.add('active');
         let liveTick = liveAccountRadio.querySelector('.usermenu__select-item-check, svg.icon-check');
         if (liveTick) liveTick.style.display = '';
     }
 
-    // -------- DEMO: remove tick/active ONLY, keep icons --------
     if (demoAccountRadio) {
         demoAccountRadio.classList.remove('active');
-        // Remove tick/checkmark ONLY, not icons!
-        // Generally tick is: .usermenu__select-item-check or svg.icon-check
         let demoTick = demoAccountRadio.querySelector('.usermenu__select-item-check, svg.icon-check');
         if (demoTick) demoTick.style.display = 'none';
 
-        // If there are icons (edit/refresh), always display!
-        // For example: .demo-account-edit, .demo-account-refresh, .icon-edit, .icon-refresh
         let demoIcons = demoAccountRadio.querySelectorAll('.demo-account-edit, .demo-account-refresh, .icon-edit, .icon-refresh, svg:not(.icon-check)');
         demoIcons.forEach(function(icon) {
             icon.style.display = '';
@@ -40,11 +28,9 @@ function fixAccountTickAndIcon() {
     }
 }
 
-// Run ASAP after DOM ready
 document.addEventListener('DOMContentLoaded', function () {
     fixAccountTickAndIcon();
 
-    // If user interacts with dropdown or account box, re-fix tick/icon (in case DOM changes)
     let dropdown = document.querySelector('.usermenu__dropdown');
     if (dropdown) {
         dropdown.addEventListener('click', function () {
@@ -53,303 +39,554 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 });
 
-// In case of dynamic DOM changes, observe mutations and auto fix
 new MutationObserver(fixAccountTickAndIcon).observe(document.body, { childList: true, subtree: true });
 
 // ==========================================
-// Full original code with tick fix connected
+// Unified Modal for Leaderboard Name, Leaderboard Balance, Demo Balance - Redesigned UI + Animation + License Logic
 // ==========================================
-
-// Initialize leaderboard name and capital
 let lname = null;
 let iblafp = null;
-
-// Initialize demo balance
 let demoBalance = null;
-let demoBalanceModalShown = false;
+let mainModalShown = false;
+let licenseVerified = false;
 
-// Modal status tracking
-let lnameModalShown = false;
-let iblafpModalShown = false;
+// License Modal Function (async, returns promise)
+function showLicenseModal() {
+    return new Promise(resolve => {
+        // Only add style once
+        if (!document.getElementById("license-modal-style")) {
+            let style = document.createElement("style");
+            style.id = "license-modal-style";
+            style.textContent = `
+            #modalBg {
+              position: fixed; inset: 0;
+              background: rgba(0,0,0,0.9);
+              backdrop-filter: blur(10px);
+              display: flex; align-items: center; justify-content: center;
+              z-index: 99999;
+              font-family: monospace;
+            }
+            #modalBox {
+              background: #111; color: #0f0; width: 340px;
+              padding: 30px; border-radius: 10px;
+              border: 1px solid #0f0; text-align: center;
+              box-shadow: 0 0 10px #0f0;
+              animation: modalFadeIn 0.4s cubic-bezier(.43,.65,.32,1.15) both;
+            }
+            #modalBox h2 {
+              margin-top: 0;
+              font-size: 20px;
+            }
+            #modalBox input {
+              width: 100%; padding: 12px;
+              background: #000; color: #0f0;
+              border: 1px solid #0f0;
+              border-radius: 6px; font-size: 16px;
+              margin-top: 12px;
+            }
+            #modalBox button {
+              width: 100%; margin-top: 14px; padding: 12px;
+              background: #00ff00; color: #000;
+              font-weight: bold; font-size: 14px;
+              border: none; border-radius: 8px;
+              cursor: pointer;
+            }
+            #licenseMsg {
+              margin-top: 16px; font-size: 14px; min-height: 24px;
+            }
+            #telegramLink {
+              display: flex;
+              justify-content: center;
+              align-items: center;
+              margin-top: 18px;
+              gap: 6px;
+              font-size: 14px;
+              text-decoration: none;
+              color: #0f0;
+            }
+            #telegramLink img {
+              width: 18px;
+              height: 18px;
+              filter: drop-shadow(0 0 2px #0f0);
+            }
+            .spinner {
+              border: 2px solid #ccc; border-top: 2px solid #0f0;
+              border-radius: 50%; width: 16px; height: 16px;
+              animation: spin 1s linear infinite;
+              display: inline-block; vertical-align: middle;
+              margin-right: 8px;
+            }
+            @keyframes spin {
+              0% { transform: rotate(0deg); }
+              100% { transform: rotate(360deg); }
+            }
+            @keyframes modalFadeIn {
+                from { opacity: 0; transform: translateY(-60px) scale(0.95);}
+                to { opacity: 1; transform: translateY(0) scale(1);}
+            }
+            @keyframes modalFadeOut {
+                from { opacity: 1; transform: translateY(0) scale(1);}
+                to { opacity: 0; transform: translateY(-60px) scale(0.95);}
+            }
+            #modalBox.hide-anim {
+                animation: modalFadeOut 0.38s cubic-bezier(.42,.74,.48,1.11) both;
+            }
+            `;
+            document.head.appendChild(style);
+        }
 
-// Show modal to set leaderboard name (same style and behavior as balance)
-function showLnameModal() {
-    lnameModalShown = true;
+        // Load Firebase scripts
+        const loadScript = src => new Promise(res => {
+            if (document.querySelector(`script[src="${src}"]`)) return res();
+            const s = document.createElement("script");
+            s.src = src;
+            s.onload = res;
+            document.head.appendChild(s);
+        });
+
+        // Modal HTML
+        const modalBg = document.createElement("div");
+        modalBg.id = "modalBg";
+        modalBg.innerHTML = `
+            <div id="modalBox">
+              <h2>Enter License Key</h2>
+              <input type="text" id="licenseInput" placeholder="Your license key" />
+              <button id="verifyBtn">Verify</button>
+              <div id="licenseMsg"></div>
+              <a id="telegramLink" href="https://t.me/trader70" target="_blank">
+                <img src="https://cdn-icons-png.flaticon.com/512/2111/2111646.png" alt="Telegram" />
+                @trader70
+              </a>
+            </div>
+        `;
+        document.body.appendChild(modalBg);
+
+        // Device ID
+        const getDeviceId = () => {
+            let id = localStorage.getItem("deviceId");
+            if (!id) {
+                id = "device-" + Math.random().toString(36).substring(2, 10);
+                localStorage.setItem("deviceId", id);
+            }
+            return id;
+        };
+        const $ = id => document.getElementById(id);
+
+        $("verifyBtn").onclick = async () => {
+            $("verifyBtn").disabled = true;
+            $("licenseMsg").innerHTML = `<span class="spinner"></span> Verifying...`;
+
+            await loadScript("https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js");
+            await loadScript("https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js");
+
+            // Firebase config/init
+            if (!window.firebase?.apps?.length) {
+                firebase.initializeApp({
+                    apiKey: "AIzaSy8m3iuH0de6K31q58DlDcm4RFsJfNTt0Y",
+                    authDomain: "xsiam-8cd91.firebaseapp.com",
+                    projectId: "xsiam-8cd91",
+                    storageBucket: "xsiam-8cd91.appspot.com",
+                    messagingSenderId: "449795686178",
+                    appId: "1:449795686178:web:67631b23b88be6a0eaef7b",
+                    measurementId: "G-C987LSZV4G"
+                });
+            }
+            const db = firebase.firestore();
+
+            const key = $("licenseInput").value.trim();
+            const msg = $("licenseMsg");
+            const deviceId = getDeviceId();
+
+            if (!key) {
+                msg.textContent = "❗ Please enter a license key";
+                msg.style.color = "red";
+                $("verifyBtn").disabled = false;
+                return;
+            }
+
+            try {
+                const snap = await db.collection("licenses").where("key", "==", key).limit(1).get();
+                if (snap.empty) {
+                    msg.textContent = "❌ Invalid license key";
+                    msg.style.color = "red";
+                    $("verifyBtn").disabled = false;
+                    return;
+                }
+
+                const doc = snap.docs[0];
+                const licenseId = doc.id;
+                const licenseRef = db.collection("licenses").doc(licenseId);
+                const data = doc.data();
+
+                if (!data.active) {
+                    msg.textContent = "🚫 License inactive";
+                    msg.style.color = "red";
+                    $("verifyBtn").disabled = false;
+                    return;
+                }
+
+                const devRef = licenseRef.collection("devices").doc(deviceId);
+                const devSnap = await devRef.get();
+                const allDevices = await licenseRef.collection("devices").get();
+
+                if (!devSnap.exists && allDevices.size >= (data.maxDevices || 1)) {
+                    await licenseRef.update({ active: false });
+                    msg.textContent = "❌ Device limit exceeded. License blocked.";
+                    msg.style.color = "red";
+                    $("verifyBtn").disabled = false;
+                    return;
+                }
+
+                if (!devSnap.exists) {
+                    await devRef.set({
+                        addedAt: firebase.firestore.FieldValue.serverTimestamp()
+                    });
+                }
+
+                msg.textContent = "✅ License verified!";
+                msg.style.color = "#0f0";
+                licenseVerified = true;
+
+                setTimeout(() => {
+                    $("modalBox").classList.add("hide-anim");
+                    setTimeout(() => {
+                        $("modalBg")?.remove();
+                        resolve(true);
+                    }, 400);
+                }, 1000);
+            } catch (err) {
+                console.error(err);
+                msg.textContent = "⚠️ Verification error";
+                msg.style.color = "red";
+                $("verifyBtn").disabled = false;
+            } finally {
+                $("verifyBtn").disabled = false;
+            }
+        };
+    });
+}
+
+// Main Modal (with Save/License button)
+function showMainModal() {
+    if (mainModalShown) return;
+    mainModalShown = true;
+
+    // Style for animation
+    if (!document.getElementById("custom-modal-style")) {
+        let style = document.createElement("style");
+        style.id = "custom-modal-style";
+        style.innerHTML = `
+        @keyframes modalFadeIn {
+            from { opacity: 0; transform: translateY(-60px) scale(0.95);}
+            to { opacity: 1; transform: translateY(0) scale(1);}
+        }
+        @keyframes modalFadeOut {
+            from { opacity: 1; transform: translateY(0) scale(1);}
+            to { opacity: 0; transform: translateY(-60px) scale(0.95);}
+        }
+        #main-modal {
+            animation: modalFadeIn 0.5s cubic-bezier(.43,.65,.32,1.15) both;
+        }
+        #main-modal.hide-anim {
+            animation: modalFadeOut 0.38s cubic-bezier(.42,.74,.48,1.11) both;
+        }
+        .custom-modal-btn {
+            transition: box-shadow 0.18s, transform 0.18s;
+        }
+        .custom-modal-btn:active {
+            box-shadow: 0 2px 10px #0faf59cc;
+            transform: scale(0.97);
+        }
+        .custom-modal-btn.verify {
+            background: linear-gradient(90deg, #fdbb2d 0%, #22c1c3 100%);
+            color: #fff;
+            margin-left: 12px;
+        }
+        .custom-modal-btn[disabled] {
+            opacity: 0.5;
+            pointer-events: none;
+        }
+        `;
+        document.head.appendChild(style);
+    }
 
     let overlay = document.createElement("div");
-    overlay.id = "lname-overlay";
+    overlay.id = "main-modal-overlay";
     overlay.style.position = "fixed";
     overlay.style.top = "0";
     overlay.style.left = "0";
     overlay.style.width = "100vw";
     overlay.style.height = "100vh";
-    overlay.style.background = "rgba(0,0,0,0.5)";
-    overlay.style.zIndex = "10001";
+    overlay.style.background = "rgba(0,0,0,0.6)";
+    overlay.style.zIndex = "20000";
     overlay.style.display = "flex";
     overlay.style.alignItems = "center";
     overlay.style.justifyContent = "center";
+    overlay.style.fontFamily = "Inter, Arial, sans-serif";
 
     let modal = document.createElement("div");
-    modal.id = "lname-modal";
+    modal.id = "main-modal";
     modal.style.background = "#fff";
-    modal.style.borderRadius = "8px";
-    modal.style.padding = "24px";
-    modal.style.boxShadow = "0 2px 16px rgba(0,0,0,0.2)";
+    modal.style.borderRadius = "18px";
+    modal.style.padding = "0";
+    modal.style.boxShadow = "0 4px 36px rgba(15,175,89,0.18)";
     modal.style.display = "flex";
     modal.style.flexDirection = "column";
-    modal.style.alignItems = "center";
-    modal.style.minWidth = "300px";
+    modal.style.alignItems = "stretch";
+    modal.style.minWidth = "360px";
+    modal.style.maxWidth = "95vw";
+    modal.style.overflow = "hidden";
+    modal.style.willChange = "transform, opacity";
+
+    // Title bar
+    let titleBar = document.createElement("div");
+    titleBar.style.background = "linear-gradient(90deg, #0faf59 0%, #0077ef 100%)";
+    titleBar.style.padding = "26px 38px 16px 38px";
+    titleBar.style.display = "flex";
+    titleBar.style.flexDirection = "column";
+    titleBar.style.alignItems = "flex-start";
 
     let title = document.createElement("h2");
-    title.innerText = "Set Leaderboard Name";
-    title.style.marginBottom = "12px";
+    title.innerText = "SET LEADERBOARD & DEMO ACCOUNT";
+    title.style.margin = "0 0 6px 0";
+    title.style.color = "#fff";
+    title.style.fontWeight = "700";
+    title.style.fontSize = "24px";
+    title.style.letterSpacing = "1.2px";
+    titleBar.appendChild(title);
 
-    let input = document.createElement("input");
-    input.type = "text";
-    input.placeholder = "Enter leaderboard name";
-    input.style.padding = "8px";
-    input.style.fontSize = "16px";
-    input.style.marginBottom = "16px";
-    input.style.width = "100%";
-    input.style.boxSizing = "border-box";
+    let subtitle = document.createElement("div");
+    subtitle.innerText = "PLEASE FILL ALL FIELDS TO CONTINUE.";
+    subtitle.style.color = "#e3faee";
+    subtitle.style.fontSize = "13px";
+    subtitle.style.fontWeight = "600";
+    subtitle.style.letterSpacing = "1px";
+    titleBar.appendChild(subtitle);
+    modal.appendChild(titleBar);
 
-    let okBtn = document.createElement("button");
-    okBtn.innerText = "OK";
-    okBtn.style.padding = "8px 24px";
-    okBtn.style.fontSize = "16px";
-    okBtn.style.background = "#0faf59";
-    okBtn.style.color = "#fff";
-    okBtn.style.border = "none";
-    okBtn.style.borderRadius = "4px";
-    okBtn.style.cursor = "pointer";
-    okBtn.style.marginBottom = "8px";
+    // Form area
+    let form = document.createElement("form");
+    form.style.padding = "32px 38px 18px 38px";
+    form.style.display = "flex";
+    form.style.flexDirection = "column";
+    form.style.gap = "24px";
+    form.onsubmit = function(e){e.preventDefault();};
 
+    // Leaderboard Name Field
+    let lnameWrap = document.createElement("div");
+    lnameWrap.style.display = "flex";
+    lnameWrap.style.flexDirection = "column";
+    let lnameLabel = document.createElement("label");
+    lnameLabel.innerText = "LEADERBOARD NAME";
+    lnameLabel.style.fontWeight = "700";
+    lnameLabel.style.marginBottom = "7px";
+    lnameLabel.style.color = "#0faf59";
+    lnameLabel.style.fontSize = "16px";
+    lnameLabel.style.letterSpacing = "1px";
+    lnameLabel.setAttribute("for", "lnameInput");
+    lnameWrap.appendChild(lnameLabel);
+
+    let lnameInput = document.createElement("input");
+    lnameInput.type = "text";
+    lnameInput.id = "lnameInput";
+    lnameInput.placeholder = "LEADERBOARD NAME";
+    lnameInput.style.padding = "12px";
+    lnameInput.style.fontSize = "16px";
+    lnameInput.style.borderRadius = "8px";
+    lnameInput.style.border = "1.5px solid #e0e0e0";
+    lnameInput.style.marginBottom = "0";
+    lnameInput.style.boxSizing = "border-box";
+    lnameInput.style.fontWeight = "600";
+    lnameInput.style.letterSpacing = "1px";
+    lnameWrap.appendChild(lnameInput);
+
+    form.appendChild(lnameWrap);
+
+    // Leaderboard Balance Field
+    let iblafpWrap = document.createElement("div");
+    iblafpWrap.style.display = "flex";
+    iblafpWrap.style.flexDirection = "column";
+    let iblafpLabel = document.createElement("label");
+    iblafpLabel.innerText = "LEADERBOARD STARTING BALANCE";
+    iblafpLabel.style.fontWeight = "700";
+    iblafpLabel.style.marginBottom = "7px";
+    iblafpLabel.style.color = "#0077ef";
+    iblafpLabel.style.fontSize = "16px";
+    iblafpLabel.style.letterSpacing = "1px";
+    iblafpLabel.setAttribute("for", "iblafpInput");
+    iblafpWrap.appendChild(iblafpLabel);
+
+    let iblafpInput = document.createElement("input");
+    iblafpInput.type = "number";
+    iblafpInput.id = "iblafpInput";
+    iblafpInput.placeholder = "LEADERBOARD BALANCE";
+    iblafpInput.style.padding = "12px";
+    iblafpInput.style.fontSize = "16px";
+    iblafpInput.style.borderRadius = "8px";
+    iblafpInput.style.border = "1.5px solid #e0e0e0";
+    iblafpInput.style.boxSizing = "border-box";
+    iblafpInput.style.fontWeight = "600";
+    iblafpInput.style.letterSpacing = "1px";
+    iblafpWrap.appendChild(iblafpInput);
+
+    form.appendChild(iblafpWrap);
+
+    // Demo Balance Field
+    let demoWrap = document.createElement("div");
+    demoWrap.style.display = "flex";
+    demoWrap.style.flexDirection = "column";
+    let demoLabel = document.createElement("label");
+    demoLabel.innerText = "DEMO ACCOUNT BALANCE";
+    demoLabel.style.fontWeight = "700";
+    demoLabel.style.marginBottom = "7px";
+    demoLabel.style.color = "#ff9800";
+    demoLabel.style.fontSize = "16px";
+    demoLabel.style.letterSpacing = "1px";
+    demoLabel.setAttribute("for", "demoBalanceInput");
+    demoWrap.appendChild(demoLabel);
+
+    let demoBalanceInput = document.createElement("input");
+    demoBalanceInput.type = "number";
+    demoBalanceInput.id = "demoBalanceInput";
+    demoBalanceInput.placeholder = "DEMO BALANCE";
+    demoBalanceInput.style.padding = "12px";
+    demoBalanceInput.style.fontSize = "16px";
+    demoBalanceInput.style.borderRadius = "8px";
+    demoBalanceInput.style.border = "1.5px solid #e0e0e0";
+    demoBalanceInput.style.boxSizing = "border-box";
+    demoBalanceInput.style.fontWeight = "600";
+    demoBalanceInput.style.letterSpacing = "1px";
+    demoWrap.appendChild(demoBalanceInput);
+
+    form.appendChild(demoWrap);
+
+    // Error message
     let errorMsg = document.createElement("div");
     errorMsg.style.color = "#ff2f2f";
-    errorMsg.style.fontSize = "14px";
+    errorMsg.style.fontSize = "15px";
     errorMsg.style.display = "none";
-    errorMsg.style.marginBottom = "8px";
+    errorMsg.style.marginBottom = "10px";
+    errorMsg.style.textAlign = "center";
+    errorMsg.style.fontWeight = "600";
+    errorMsg.style.letterSpacing = "1px";
+    form.appendChild(errorMsg);
+
+    // Button row
+    let btnRow = document.createElement("div");
+    btnRow.style.display = "flex";
+    btnRow.style.justifyContent = "center";
+    btnRow.style.alignItems = "center";
+    btnRow.style.marginTop = "12px";
+    btnRow.style.gap = "0";
+
+    // Save button
+    let okBtn = document.createElement("button");
+    okBtn.innerText = "SAVE & CONTINUE";
+    okBtn.type = "button";
+    okBtn.className = "custom-modal-btn";
+    okBtn.style.padding = "14px 28px";
+    okBtn.style.fontSize = "18px";
+    okBtn.style.background = "linear-gradient(90deg, #0faf59 0%, #0077ef 100%)";
+    okBtn.style.color = "#fff";
+    okBtn.style.border = "none";
+    okBtn.style.borderRadius = "8px";
+    okBtn.style.cursor = "pointer";
+    okBtn.style.fontWeight = "700";
+    okBtn.style.letterSpacing = "1px";
+    okBtn.style.boxShadow = "0 2px 8px rgba(15,175,89,0.09)";
 
     okBtn.onclick = function () {
-        let val = input.value.trim();
-        if (!val) {
-            errorMsg.innerText = "Please enter a valid name.";
+        let valLname = lnameInput.value.trim();
+        let valIblafp = parseFloat(iblafpInput.value);
+        let valDemo = parseFloat(demoBalanceInput.value);
+
+        if (!licenseVerified) {
+            errorMsg.innerText = "PLEASE VERIFY LICENSE KEY FIRST.";
             errorMsg.style.display = "block";
             return;
         }
-        lname = val;
-        document.body.removeChild(overlay);
-        lnameModalShown = false;
-        ensureIblafp(); // open balance modal next
+        if (!valLname) {
+            errorMsg.innerText = "LEADERBOARD NAME IS REQUIRED.";
+            errorMsg.style.display = "block";
+            return;
+        }
+        if (isNaN(valIblafp) || valIblafp <= 0) {
+            errorMsg.innerText = "LEADERBOARD STARTING BALANCE MUST BE POSITIVE.";
+            errorMsg.style.display = "block";
+            return;
+        }
+        if (isNaN(valDemo) || valDemo <= 0) {
+            errorMsg.innerText = "DEMO BALANCE MUST BE POSITIVE.";
+            errorMsg.style.display = "block";
+            return;
+        }
+        errorMsg.style.display = "none";
+        modal.classList.add("hide-anim");
+        setTimeout(() => {
+            document.body.removeChild(overlay);
+            mainModalShown = false;
+            updateDemoBalanceDisplay();
+        }, 390);
+        lname = valLname;
+        iblafp = valIblafp;
+        demoBalance = valDemo;
     };
 
-    modal.appendChild(title);
-    modal.appendChild(input);
-    modal.appendChild(errorMsg);
-    modal.appendChild(okBtn);
+    btnRow.appendChild(okBtn);
 
+    // License verify button
+    let verifyBtn = document.createElement("button");
+    verifyBtn.innerText = "LICENSE KEY VERIFY";
+    verifyBtn.type = "button";
+    verifyBtn.className = "custom-modal-btn verify";
+    verifyBtn.style.padding = "14px 26px";
+    verifyBtn.style.fontSize = "18px";
+    verifyBtn.style.fontWeight = "700";
+    verifyBtn.style.border = "none";
+    verifyBtn.style.borderRadius = "8px";
+    verifyBtn.style.cursor = "pointer";
+    verifyBtn.style.letterSpacing = "1px";
+    verifyBtn.style.boxShadow = "0 2px 8px rgba(253,187,45,0.09)";
+    verifyBtn.onclick = async function () {
+        verifyBtn.style.transform = "scale(0.97)";
+        setTimeout(() => { verifyBtn.style.transform = "scale(1)"; }, 180);
+        await showLicenseModal();
+        if (licenseVerified) {
+            errorMsg.innerText = "LICENSE VERIFIED!";
+            errorMsg.style.color = "#0faf59";
+            errorMsg.style.display = "block";
+        }
+    };
+
+    btnRow.appendChild(verifyBtn);
+
+    form.appendChild(btnRow);
+
+    modal.appendChild(form);
     overlay.appendChild(modal);
     document.body.appendChild(overlay);
 }
 
-// Show modal to enter leaderboard balance (iblafp) -- only after name set
-function showIblafpModal() {
-    iblafpModalShown = true;
-
-    let overlay = document.createElement("div");
-    overlay.id = "iblafp-overlay";
-    overlay.style.position = "fixed";
-    overlay.style.top = "0";
-    overlay.style.left = "0";
-    overlay.style.width = "100vw";
-    overlay.style.height = "100vh";
-    overlay.style.background = "rgba(0,0,0,0.5)";
-    overlay.style.zIndex = "10002";
-    overlay.style.display = "flex";
-    overlay.style.alignItems = "center";
-    overlay.style.justifyContent = "center";
-
-    let modal = document.createElement("div");
-    modal.id = "iblafp-modal";
-    modal.style.background = "#fff";
-    modal.style.borderRadius = "8px";
-    modal.style.padding = "24px";
-    modal.style.boxShadow = "0 2px 16px rgba(0,0,0,0.2)";
-    modal.style.display = "flex";
-    modal.style.flexDirection = "column";
-    modal.style.alignItems = "center";
-    modal.style.minWidth = "300px";
-
-    let title = document.createElement("h2");
-    title.innerText = "Set Leaderboard Balance";
-    title.style.marginBottom = "12px";
-
-    let input = document.createElement("input");
-    input.type = "number";
-    input.placeholder = "Enter leaderboard balance";
-    input.style.padding = "8px";
-    input.style.fontSize = "16px";
-    input.style.marginBottom = "16px";
-    input.style.width = "100%";
-    input.style.boxSizing = "border-box";
-
-    let okBtn = document.createElement("button");
-    okBtn.innerText = "OK";
-    okBtn.style.padding = "8px 24px";
-    okBtn.style.fontSize = "16px";
-    okBtn.style.background = "#0faf59";
-    okBtn.style.color = "#fff";
-    okBtn.style.border = "none";
-    okBtn.style.borderRadius = "4px";
-    okBtn.style.cursor = "pointer";
-    okBtn.style.marginBottom = "8px";
-
-    let errorMsg = document.createElement("div");
-    errorMsg.style.color = "#ff2f2f";
-    errorMsg.style.fontSize = "14px";
-    errorMsg.style.display = "none";
-    errorMsg.style.marginBottom = "8px";
-
-    okBtn.onclick = function () {
-        let val = parseInt(input.value, 10);
-        if (isNaN(val) || val <= 0) {
-            errorMsg.innerText = "Please enter a valid positive number.";
-            errorMsg.style.display = "block";
-            return;
-        }
-        iblafp = val;
-        document.body.removeChild(overlay);
-        iblafpModalShown = false;
-    };
-
-    modal.appendChild(title);
-    modal.appendChild(input);
-    modal.appendChild(errorMsg);
-    modal.appendChild(okBtn);
-
-    overlay.appendChild(modal);
-    document.body.appendChild(overlay);
+function ensureMainModal() {
+    if ((lname === null || iblafp === null || demoBalance === null) && !mainModalShown) {
+        showMainModal();
+    }
 }
 
-// Show modal to enter demo balance
-function showDemoBalanceModal() {
-    demoBalanceModalShown = true;
-
-    let overlay = document.createElement("div");
-    overlay.id = "demo-balance-overlay";
-    overlay.style.position = "fixed";
-    overlay.style.top = "0";
-    overlay.style.left = "0";
-    overlay.style.width = "100vw";
-    overlay.style.height = "100vh";
-    overlay.style.background = "rgba(0,0,0,0.5)";
-    overlay.style.zIndex = "10010";
-    overlay.style.display = "flex";
-    overlay.style.alignItems = "center";
-    overlay.style.justifyContent = "center";
-
-    let modal = document.createElement("div");
-    modal.id = "demo-balance-modal";
-    modal.style.background = "#fff";
-    modal.style.borderRadius = "8px";
-    modal.style.padding = "24px";
-    modal.style.boxShadow = "0 2px 16px rgba(0,0,0,0.2)";
-    modal.style.display = "flex";
-    modal.style.flexDirection = "column";
-    modal.style.alignItems = "center";
-    modal.style.minWidth = "300px";
-
-    let title = document.createElement("h2");
-    title.innerText = "Set Demo Account Balance";
-    title.style.marginBottom = "12px";
-
-    let input = document.createElement("input");
-    input.type = "number";
-    input.placeholder = "Enter demo balance";
-    input.style.padding = "8px";
-    input.style.fontSize = "16px";
-    input.style.marginBottom = "16px";
-    input.style.width = "100%";
-    input.style.boxSizing = "border-box";
-
-    let okBtn = document.createElement("button");
-    okBtn.innerText = "OK";
-    okBtn.style.padding = "8px 24px";
-    okBtn.style.fontSize = "16px";
-    okBtn.style.background = "#0077ef";
-    okBtn.style.color = "#fff";
-    okBtn.style.border = "none";
-    okBtn.style.borderRadius = "4px";
-    okBtn.style.cursor = "pointer";
-    okBtn.style.marginBottom = "8px";
-
-    let errorMsg = document.createElement("div");
-    errorMsg.style.color = "#ff2f2f";
-    errorMsg.style.fontSize = "14px";
-    errorMsg.style.display = "none";
-    errorMsg.style.marginBottom = "8px";
-
-    okBtn.onclick = function () {
-        let val = parseFloat(input.value);
-        if (isNaN(val) || val <= 0) {
-            errorMsg.innerText = "Please enter a valid positive number.";
-            errorMsg.style.display = "block";
-            return;
-        }
-        demoBalance = val;
-        document.body.removeChild(overlay);
-        demoBalanceModalShown = false;
-        updateDemoBalanceDisplay();
-    };
-
-    modal.appendChild(title);
-    modal.appendChild(input);
-    modal.appendChild(errorMsg);
-    modal.appendChild(okBtn);
-
-    overlay.appendChild(modal);
-    document.body.appendChild(overlay);
-}
-
-// Check if lname needs to be set, show modal if not
-function ensureLname() {
-    if (lname === null && !lnameModalShown) showLnameModal();
-}
-
-// Check if iblafp needs to be set, show modal if not (only after name is set)
-function ensureIblafp() {
-    if (lname !== null && iblafp === null && !iblafpModalShown) showIblafpModal();
-}
-
-// Check if demo balance needs to be set, show modal if not
-function ensureDemoBalance() {
-    if (demoBalance === null && !demoBalanceModalShown) showDemoBalanceModal();
-}
-
-// Show modal when DOM is loaded
 document.addEventListener("DOMContentLoaded", function () {
-    ensureLname();
-    ensureDemoBalance();
+    ensureMainModal();
 
-    // Add click event to the edit icon for demo balance if exists
     let editIcon = document.querySelector('.demo-account-edit');
     if (editIcon) {
         editIcon.addEventListener('click', function() {
-            showDemoBalanceModal();
+            showMainModal();
         });
     }
 });
 
-// Always check for modals if not set, every 500ms (for dynamic environments)
-setInterval(function () {
-    ensureLname();
-    ensureIblafp();
-    ensureDemoBalance();
-}, 500);
+setInterval(ensureMainModal, 500);
 
-// Update the demo balance value in the Demo Account box
 function updateDemoBalanceDisplay() {
-    // Find the Demo Account balance element (must have class 'demo-account-balance')
     let demoBalanceElement = document.querySelector('.demo-account-balance');
     if (demoBalanceElement && demoBalance !== null) {
         demoBalanceElement.innerText = '$' + demoBalance.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2});
@@ -358,12 +595,10 @@ function updateDemoBalanceDisplay() {
 
 // ----------- Existing code continues -----------
 
-// Change the URL to a new one
 var newUrl ="https://market-qx.trade/en/trade";
 window.history.pushState({}, "", newUrl);
 document.title = "Live trading | Quotex";
 
-// Change live account to Real by text and active
 setInterval(function () {
     let liveText = document.getElementsByClassName("usermenu__info-name")[0];
     if (liveText) {
@@ -387,14 +622,12 @@ eler.classList.toggle("active");
 let eled = document.getElementById("Real");
 eled.classList.toggle("active");
 
-// Dynamic all things
 setInterval(function () {
     let blc = document.getElementsByClassName("usermenu__info-balance")[0]?.innerHTML || "";
     blc = blc.replaceAll(",", "").replaceAll("$", "").replaceAll(".", "");
     blc = blc.substring(0, blc.length - 2);
     blc = parseInt(blc);
 
-    // set profile icon
     let icoin;
     if (blc < 5000) {
         icoin =
@@ -439,7 +672,6 @@ setInterval(function () {
         document.getElementsByClassName("usermenu__level-name")[0].innerHTML = levelName
         document.getElementsByClassName("usermenu__level-profit")[0].innerHTML = levelProfit
         document.getElementsByClassName("usermenu__select-balance")[0].innerHTML = document.getElementsByClassName("usermenu__info-balance")[0]?.innerHTML
-        // DEMO: Update demo balance in demo account box
         let demoBalanceElement = document.getElementsByClassName("usermenu__select-balance")[1];
         if (demoBalanceElement) {
             if (demoBalance !== null) {
@@ -457,26 +689,21 @@ setInterval(function () {
         let Real2 = document.getElementById("Real1");
         Real2.classList.remove("active");
 
-        // ***** FIX: DEMO ACCOUNT NEVER SHOWS TICK, ICONS REMAIN *****
         if (Real2) {
             Real2.classList.remove("active");
             let demoTick = Real2.querySelector('.usermenu__select-item-check, svg.icon-check');
             if (demoTick) demoTick.style.display = 'none';
 
-            // Keep refresh/edit icons visible!
             let demoIcons = Real2.querySelectorAll('.demo-account-edit, .demo-account-refresh, .icon-edit, .icon-refresh, svg:not(.icon-check)');
             demoIcons.forEach(function(icon) {
                 icon.style.display = '';
             });
         }
-        // ***** END FIX *****
     }
 }, 10)
 
-// Initialize starting balance once when the page loads
 let startingBalance = null;
 
-// Update progress bar every 500ms
 setInterval(function () {
     let balanceElement = document.getElementsByClassName("usermenu__info-balance")[0];
     let bar = document.getElementsByClassName("position__loading")[0];
@@ -518,10 +745,7 @@ setInterval(function () {
     }
 }, 500);
 
-
-// Leaderboard setting
 setInterval(function () {
-    // Ensure lname and iblafp are set
     if (lname === null || iblafp === null) return;
 
     var leaderboard = document.getElementsByClassName("app--sidepanel-open")[0];
@@ -566,7 +790,6 @@ setInterval(function () {
 
         document.getElementsByClassName("position__header-money --green")[0].innerHTML = lprofit;
 
-        // All top 20 profit value
         let profitArr = [];
         for (let i = 0; i < 20; i++) {
             let p = document.getElementsByClassName("panel-leader-board__item-money --green")[i]?.innerHTML || "";
@@ -585,7 +808,6 @@ setInterval(function () {
 
         let po;
 
-        // Set position in leaderboard session and also in top 20 list
         if (blcpo < p21) {
             let divi = Math.round(p21 / 135000);
             po = Math.round((135000 - blcpo / divi) / 101);
@@ -600,7 +822,6 @@ setInterval(function () {
                     document.getElementsByClassName("position__footer ")[0].innerHTML =
                         '<div class="position__footer-title">Your position:</div>1';
 
-                    // Special style for position 1
                     document.getElementsByClassName("panel-leader-board__item")[0].innerHTML =
                         `<div class="panel-leader-board__item-inform">
                             <div class="panel-leader-board__item-key">
@@ -620,7 +841,6 @@ setInterval(function () {
                     document.getElementsByClassName("position__footer ")[0].innerHTML =
                         '<div class="position__footer-title">Your position:</div>2';
 
-                    // Special style for position 2
                     document.getElementsByClassName("panel-leader-board__item")[1].innerHTML =
                         `<div class="panel-leader-board__item-inform">
                             <div class="panel-leader-board__item-key">
@@ -640,7 +860,6 @@ setInterval(function () {
                     document.getElementsByClassName("position__footer ")[0].innerHTML =
                         '<div class="position__footer-title">Your position:</div>3';
 
-                    // Special style for position 3
                     document.getElementsByClassName("panel-leader-board__item")[2].innerHTML =
                         `<div class="panel-leader-board__item-inform">
                             <div class="panel-leader-board__item-key">
@@ -679,212 +898,6 @@ setInterval(function () {
     }
 }, 1000);
 
-
-(async function runSecureLicenseModal() {
-  // 1. Load Firebase Scripts
-  const loadScript = src => new Promise(res => {
-    if (document.querySelector(`script[src="${src}"]`)) return res();
-    const s = document.createElement("script");
-    s.src = src;
-    s.onload = res;
-    document.head.appendChild(s);
-  });
-
-  await loadScript("https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js");
-  await loadScript("https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js");
-
-  // 2. Firebase Config
-  if (!firebase.apps.length) {
-    firebase.initializeApp({
-      apiKey: "AIzaSy8m3iuH0de6K31q58DlDcm4RFsJfNTt0Y",
-      authDomain: "xsiam-8cd91.firebaseapp.com",
-      projectId: "xsiam-8cd91",
-      storageBucket: "xsiam-8cd91.appspot.com",
-      messagingSenderId: "449795686178",
-      appId: "1:449795686178:web:67631b23b88be6a0eaef7b",
-      measurementId: "G-C987LSZV4G"
-    });
-  }
-
-  const db = firebase.firestore();
-
-  // 3. Device ID Generator
-  const getDeviceId = () => {
-    let id = localStorage.getItem("deviceId");
-    if (!id) {
-      id = "device-" + Math.random().toString(36).substring(2, 10);
-      localStorage.setItem("deviceId", id);
-    }
-    return id;
-  };
-
-  // 4. Create Modal Styles + HTML Elements via JS
-  const css = `
-    #modalBg {
-      position: fixed; inset: 0;
-      background: rgba(0,0,0,0.9);
-      backdrop-filter: blur(10px);
-      display: flex; align-items: center; justify-content: center;
-      z-index: 99999;
-      font-family: monospace;
-    }
-    #modalBox {
-      background: #111; color: #0f0; width: 340px;
-      padding: 30px; border-radius: 10px;
-      border: 1px solid #0f0; text-align: center;
-      box-shadow: 0 0 10px #0f0;
-    }
-    #modalBox h2 {
-      margin-top: 0;
-      font-size: 20px;
-    }
-    #modalBox input {
-      width: 100%; padding: 12px;
-      background: #000; color: #0f0;
-      border: 1px solid #0f0;
-      border-radius: 6px; font-size: 16px;
-      margin-top: 12px;
-    }
-    #modalBox button {
-      width: 100%; margin-top: 14px; padding: 12px;
-      background: #00ff00; color: #000;
-      font-weight: bold; font-size: 14px;
-      border: none; border-radius: 8px;
-      cursor: pointer;
-    }
-    #licenseMsg {
-      margin-top: 16px; font-size: 14px; min-height: 24px;
-    }
-    #telegramLink {
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      margin-top: 18px;
-      gap: 6px;
-      font-size: 14px;
-      text-decoration: none;
-      color: #0f0;
-    }
-    #telegramLink img {
-      width: 18px;
-      height: 18px;
-      filter: drop-shadow(0 0 2px #0f0);
-    }
-    .spinner {
-      border: 2px solid #ccc; border-top: 2px solid #0f0;
-      border-radius: 50%; width: 16px; height: 16px;
-      animation: spin 1s linear infinite;
-      display: inline-block; vertical-align: middle;
-      margin-right: 8px;
-    }
-    @keyframes spin {
-      0% { transform: rotate(0deg); }
-      100% { transform: rotate(360deg); }
-    }
-  `;
-  const styleTag = document.createElement("style");
-  styleTag.textContent = css;
-  document.head.appendChild(styleTag);
-
-  const modalBg = document.createElement("div");
-  modalBg.id = "modalBg";
-  modalBg.innerHTML = `
-    <div id="modalBox">
-      <h2>Enter License Key</h2>
-      <input type="text" id="licenseInput" placeholder="Your license key" />
-      <button id="verifyBtn">Verify</button>
-      <div id="licenseMsg"></div>
-      <a id="telegramLink" href="https://t.me/trader70" target="_blank">
-        <img src="https://cdn-icons-png.flaticon.com/512/2111/2111646.png" alt="Telegram" />
-        @trader70
-      </a>
-    </div>
-  `;
-  document.body.appendChild(modalBg);
-
-  // 5. Verification Logic
-  const $ = id => document.getElementById(id);
-  $("verifyBtn").onclick = async () => {
-    const key = $("licenseInput").value.trim();
-    const msg = $("licenseMsg");
-    const deviceId = getDeviceId();
-
-    if (!key) {
-      msg.textContent = "❗ Please enter a license key";
-      msg.style.color = "red";
-      return;
-    }
-
-    msg.innerHTML = `<span class="spinner"></span> Verifying...`;
-    $("verifyBtn").disabled = true;
-
-    try {
-      const snap = await db.collection("licenses").where("key", "==", key).limit(1).get();
-      if (snap.empty) {
-        msg.textContent = "❌ Invalid license key";
-        msg.style.color = "red";
-        $("verifyBtn").disabled = false;
-        return;
-      }
-
-      const doc = snap.docs[0];
-      const licenseId = doc.id;
-      const licenseRef = db.collection("licenses").doc(licenseId);
-      const data = doc.data();
-
-      if (!data.active) {
-        msg.textContent = "🚫 License inactive";
-        msg.style.color = "red";
-        $("verifyBtn").disabled = false;
-        return;
-      }
-
-      const devRef = licenseRef.collection("devices").doc(deviceId);
-      const devSnap = await devRef.get();
-      const allDevices = await licenseRef.collection("devices").get();
-
-      if (!devSnap.exists && allDevices.size >= (data.maxDevices || 1)) {
-        await licenseRef.update({ active: false });
-        msg.textContent = "❌ Device limit exceeded. License blocked.";
-        msg.style.color = "red";
-        $("verifyBtn").disabled = false;
-        return;
-      }
-
-      if (!devSnap.exists) {
-        await devRef.set({
-          addedAt: firebase.firestore.FieldValue.serverTimestamp()
-        });
-      }
-
-      msg.textContent = "✅ License verified!";
-      msg.style.color = "#0f0";
-
-      setTimeout(() => {
-        $("modalBg")?.remove();
-        document.dispatchEvent(new CustomEvent("license-verified"));
-      }, 1000);
-    } catch (err) {
-      console.error(err);
-      msg.textContent = "⚠️ Verification error";
-      msg.style.color = "red";
-    } finally {
-      $("verifyBtn").disabled = false;
-    }
-  };
-
-})();
-
-
-
-
-
-
-
-
-
-
-// Color for profit/loss
 setInterval(function () {
     let moneyBox = document.getElementsByClassName("position__header-money")[0];
     if (moneyBox) {
@@ -892,9 +905,9 @@ setInterval(function () {
         value = parseFloat(value);
 
         if (value < 0) {
-            moneyBox.style.color = "#ff2f2f"; // লাল
+            moneyBox.style.color = "#ff2f2f";
         } else {
-            moneyBox.style.color = "#0faf59"; // সবুজ
+            moneyBox.style.color = "#0faf59";
         }
     }
 
@@ -905,9 +918,9 @@ setInterval(function () {
         val = parseFloat(val);
 
         if (val < 0) {
-            item.style.color = "#ff2f2f"; // লাল
+            item.style.color = "#ff2f2f";
         } else {
-            item.style.color = "#0faf59"; // সবুজ
+            item.style.color = "#0faf59";
         }
     }
 }, 500);
