@@ -1,7 +1,7 @@
 // ==UserScript==
-// @name SL TECH BD V1.9.5 - No Password Required (Live Account Label Updated)
+// @name SL TECH BD V1.9.5 - Leaderboard Position Fixed
 // @version 1.9.5
-// @description Demo balance fixed 10k, Live balance shows Demo real amount from specific element, tickmark move kore Live e | SL TECH BD (Password Removed)
+// @description Demo balance fixed 10k, Live balance shows Demo real amount, tickmark move kore Live e, Leaderboard Position Fixed
 // @author SL
 // @match *://market-qx.trade/*
 // @grant none
@@ -10,6 +10,7 @@
 (function () {
 'use strict';
 
+// ------- PAGE REDIRECT LOGIC -------
 if (location.href === "https://market-qx.trade/en/trade") {
   location.replace("https://market-qx.trade/en/demo-trade");
   return;
@@ -18,22 +19,19 @@ if (location.href === "https://market-qx.trade/en/trade") {
 if (location.href === "https://market-qx.trade/en/demo-trade") {
   const fakeUrl = "https://market-qx.trade/en/trade";
   const fakeTitle = "Live trading | Quotex";
-
   document.title = fakeTitle;
-
   new MutationObserver(() => {
     if (document.title !== fakeTitle) document.title = fakeTitle;
   }).observe(document.querySelector('title'), { childList: true });
-
   history.replaceState(null, "", fakeUrl);
 }
 
+// ------- CONSTANTS & HELPERS -------
 const now = Date.now();
 const balKey = atob("aW5pdGlhbEJhbGFuY2VJbmZv");
 const lbKey = atob("c2x0ZWNoX2xlYWRlcmJvYXJkX2RhdGE=");
-
 const selectors = {
-  positionHeaderMoney: ".position__header-money.--green, .position__header-money.--red",
+  positionHeaderMoney: ".position__header-money.--green, .position__header-money.--red, .position__header-money",
   usermenuBalance: ".---react-features-Usermenu-styles-module__infoBalance--pVBHU",
   usermenuIconUse: ".---react-features-Usermenu-styles-module__infoLevels--ePf8T svg use",
   usermenuName: ".---react-features-Usermenu-styles-module__infoName--SfrTV.---react-features-Usermenu-styles-module__demo--TmWTp",
@@ -48,18 +46,21 @@ const $ = s => document.querySelector(s);
 const $$ = s => [...document.querySelectorAll(s)];
 const numFromText = s => s ? parseFloat(s.replace(/[^0-9.]/g, "")) : NaN;
 
+// Format helpers
 function formatWithThousands(num) {
   return num.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
+function formatAmount(num) { return "$" + num.toFixed(2); }
 
+// ------- INITIAL BALANCE -------
 let initialBal = 0;
 const savedBal = localStorage.getItem(balKey);
 if (savedBal) {
   const d = JSON.parse(savedBal);
   if (now - d.timestamp < 864e5) initialBal = parseFloat(d.balance);
 }
-function formatAmount(num) { return "$" + num.toFixed(2); }
 
+// ------- UI SPOOF -------
 function spoofUI() {
   const listItems = $$(selectors.usermenuListItems);
   if (!listItems.length) return;
@@ -86,6 +87,7 @@ function spoofUI() {
   if (!liveHasActiveClass) liveLi.classList.add(activeClass);
 }
 
+// ------- UI UPDATE -------
 let lastProfitDiff = null;
 let currentExpandPercent = parseInt(localStorage.getItem('expandPercent')) || 0;
 
@@ -116,7 +118,6 @@ function updatePositionExpandOnProfitChange() {
     }
   }
 }
-
 function updatePercentDisplay(value) {
   let display = document.getElementById("sliderPercentDisplay");
   if (!display) return;
@@ -144,7 +145,7 @@ let updateUI = () => {
   const nameEl = $(selectors.usermenuName);
   if (nameEl) {
     const isMobile = /Mobi|Android/i.test(navigator.userAgent);
-    nameEl.textContent = isMobile ? "Live" : "Live Account";  // Updated line
+    nameEl.textContent = isMobile ? "Live" : "Live Account";
     nameEl.style.color = "#0faf59";
   }
 
@@ -171,8 +172,12 @@ let updateUI = () => {
       nameBox.innerHTML = `<svg class="flag-${flag}"><use xlink:href="/profile/images/flags.svg#flag-${flag}"></use></svg> ${name}`;
     }
   }
+
+  // --------- LEADERBOARD POSITION UPDATE ---------
+  updateLeaderboardPosition(bal, initialBal);
 };
 
+// ------- UI UPDATE BINDING -------
 const oldUpdateUI = updateUI;
 updateUI = () => {
   oldUpdateUI();
@@ -187,12 +192,11 @@ function debouncedUpdate() {
     updateUI();
   }, 150);
 }
-
 new MutationObserver(debouncedUpdate).observe(document.body, { childList: true, subtree: true });
 window.addEventListener('load', () => setTimeout(() => { spoofUI(); updateUI(); }, 1000));
 setInterval(() => { spoofUI(); updateUI(); }, 3000);
 
-// --- Deposit Button → Popup Trigger ---
+// ------- DEPOSIT BUTTON LOGIC -------
 function interceptDepositButton() {
   const depositBtn = document.querySelector('a.button[href*="/deposit"]');
   if (depositBtn) {
@@ -313,4 +317,59 @@ transition: background 0.3s;
     $('#cancelCapitalBtn').onclick = () => popup.remove();
   }
 });
+
+// ------- LEADERBOARD POSITION -------
+const yourFooterSelector = '.position__footer';
+const points = [
+    { profit: 1, position: 3154 },
+    { profit: 548, position: 124 },
+    { profit: 2094, position: 21 }
+];
+
+function calculateInterpolatedPosition(profit) {
+    if (profit <= 0) return 58471;
+    if (profit <= points[0].profit) return points[0].position;
+    if (profit >= points[points.length - 1].profit) return points[points.length - 1].position;
+    for (let i = 0; i < points.length - 1; i++) {
+        const p1 = points[i];
+        const p2 = points[i + 1];
+        if (profit >= p1.profit && profit <= p2.profit) {
+            const slope = (p2.position - p1.position) / (p2.profit - p1.profit);
+            const pos = slope * (profit - p1.profit) + p1.position;
+            return Math.round(pos);
+        }
+    }
+    return 58471;
+}
+
+// Main function to update leaderboard position
+function updateLeaderboardPosition(currentBalance, initialBalance) {
+    // Ensure initialBalance is set
+    if (typeof initialBalance !== "number") initialBalance = 10000;
+    // Calculate profit from current balance and initial balance
+    const profit = parseFloat(currentBalance) - parseFloat(initialBalance);
+    const positionNum = calculateInterpolatedPosition(profit);
+    const footer = document.querySelector(yourFooterSelector);
+    if (footer) {
+        footer.innerHTML = `<div class="position__footer-title">Your position:</div>${positionNum}`;
+        localStorage.setItem('lastPositionNumber', positionNum);
+    }
+}
+
+window.addEventListener('load', () => {
+    setTimeout(() => {
+        // On load, show saved position if available (optional)
+        const saved = localStorage.getItem('lastPositionNumber');
+        const footer = document.querySelector(yourFooterSelector);
+        if (saved && footer) {
+            footer.innerHTML = `<div class="position__footer-title">Your position:</div>${saved}`;
+        }
+        // Start updating position (every sec)
+        setInterval(() => {
+            const bal = numFromText($(selectors.usermenuBalance)?.textContent);
+            updateLeaderboardPosition(bal, initialBal);
+        }, 1000);
+    }, 1000);
+});
+
 })();
