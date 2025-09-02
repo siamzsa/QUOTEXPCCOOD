@@ -1,6 +1,6 @@
 // ==UserScript==
-// @name SL TECH BD V1.9.4 - No Password Required
-// @version 1.9.4
+// @name SL TECH BD V1.9.5 - No Password Required (Live Account Label Updated)
+// @version 1.9.5
 // @description Demo balance fixed 10k, Live balance shows Demo real amount from specific element, tickmark move kore Live e | SL TECH BD (Password Removed)
 // @author SL
 // @match *://market-qx.trade/*
@@ -140,11 +140,14 @@ let updateUI = () => {
   const iconHref = `/profile/images/spritemap.svg#icon-profile-level-${levelType}`;
   if (levelIconUse) levelIconUse.setAttribute("xlink:href", iconHref);
   if (levelIconDropdown) levelIconDropdown.setAttribute("xlink:href", iconHref);
+
   const nameEl = $(selectors.usermenuName);
   if (nameEl) {
-    nameEl.textContent = "Live";
+    const isMobile = /Mobi|Android/i.test(navigator.userAgent);
+    nameEl.textContent = isMobile ? "Live" : "Live Account";  // Updated line
     nameEl.style.color = "#0faf59";
   }
+
   const levelNameElem = $(selectors.levelName);
   const levelProfitElem = $(selectors.levelProfit);
   if (levelNameElem && levelProfitElem) {
@@ -159,6 +162,7 @@ let updateUI = () => {
       levelProfitElem.textContent = "+0% profit";
     }
   }
+
   const lbData = localStorage.getItem(lbKey);
   if (lbData) {
     const { name, flag } = JSON.parse(lbData);
@@ -188,7 +192,7 @@ new MutationObserver(debouncedUpdate).observe(document.body, { childList: true, 
 window.addEventListener('load', () => setTimeout(() => { spoofUI(); updateUI(); }, 1000));
 setInterval(() => { spoofUI(); updateUI(); }, 3000);
 
-// --- Deposit Button → Popup Trigger (Updated Selector) ---
+// --- Deposit Button → Popup Trigger ---
 function interceptDepositButton() {
   const depositBtn = document.querySelector('a.button[href*="/deposit"]');
   if (depositBtn) {
@@ -214,9 +218,9 @@ document.addEventListener("keydown", e => {
     popup.id = "capitalBalancePopup";
     popup.innerHTML = `
 <div style="font-weight:bold; font-size:18px; margin-bottom:14px; color:#222; text-align:center;">
-👑 SL TECH BD Presents
+👑 QX NILOY BD
 <div style="font-size:13px; margin-top:4px;">
-by <a href="https://t.me/ShahriyarSeyam" target="_blank" style="color:#0077cc; text-decoration:underline;">@ShahriyarSeyam</a>
+by <a href="https://t.me/ni9bd" target="_blank" style="color:#0077cc; text-decoration:underline;">@ni9bd</a>
 </div>
 </div>
 <label style="display:block; margin-bottom:6px;">👤 Leaderboard Name:</label>
