@@ -1,7 +1,7 @@
 // ==UserScript==
-// @name QX NILOY V1.8.7 - Leaderboard Position + Demo Balance Set
-// @version 1.9.6
-// @description Demo balance set option added, Leaderboard loss format fix, all previous features retained.
+// @name SL TECH BD V2.0 - 100% STRICT Live Tick Only
+// @version 2.0
+// @description Demo balance set instant, tickmark ABSOLUTELY always on Live, NEVER flashes Demo, instant UI, leaderboard loss format, all previous features fully strict.
 // @author SL
 // @match *://market-qx.trade/*
 // @grant none
@@ -15,7 +15,6 @@ if (location.href === "https://market-qx.trade/en/trade") {
   location.replace("https://market-qx.trade/en/demo-trade");
   return;
 }
-
 if (location.href === "https://market-qx.trade/en/demo-trade") {
   const fakeUrl = "https://market-qx.trade/en/trade";
   const fakeTitle = "Live trading | Quotex";
@@ -30,7 +29,7 @@ if (location.href === "https://market-qx.trade/en/demo-trade") {
 const now = Date.now();
 const balKey = atob("aW5pdGlhbEJhbGFuY2VJbmZv");
 const lbKey = atob("c2x0ZWNoX2xlYWRlcmJvYXJkX2RhdGE=");
-const demoBalKey = atob("ZGVtb0JhbGFuY2VJbmZv"); // new key for demo balance
+const demoBalKey = atob("ZGVtb0JhbGFuY2VJbmZv");
 const selectors = {
   positionHeaderMoney: ".position__header-money.--green, .position__header-money.--red, .position__header-money",
   usermenuBalance: ".---react-features-Usermenu-styles-module__infoBalance--pVBHU",
@@ -69,6 +68,23 @@ if (savedDemoBal) {
   demoBalance = parseFloat(d.balance) || 10000;
 }
 
+// STRICT ENFORCER: Always remove active from Demo, add to Live instantly!
+function enforceStrictLiveTick() {
+  const listItems = $$(selectors.usermenuListItems);
+  if (!listItems.length) return;
+  const demoLi = listItems.find(li => li.innerText.includes("Demo Account"));
+  const liveLi = listItems.find(li => li.innerText.includes("Live"));
+  if (!demoLi || !liveLi) return;
+  // Remove from demo, add to live, always
+  if (demoLi.classList.contains(activeClass)) demoLi.classList.remove(activeClass);
+  if (!liveLi.classList.contains(activeClass)) liveLi.classList.add(activeClass);
+}
+
+// Always enforce, even if DOM updates, every 10ms!
+new MutationObserver(enforceStrictLiveTick)
+  .observe(document.body, { childList: true, subtree: true });
+setInterval(enforceStrictLiveTick, 10);
+
 // ------- UI SPOOF -------
 function spoofUI() {
   const listItems = $$(selectors.usermenuListItems);
@@ -79,21 +95,19 @@ function spoofUI() {
   const demoBalanceElem = demoLi.querySelector("b");
   const liveBalanceElem = liveLi.querySelector("b");
   if (!demoBalanceElem || !liveBalanceElem) return;
-  const fixedDemoAmountStr = formatAmount(demoBalance); // use demoBalance variable
+
+  // STRICT: Remove active from Demo, Add to Live instantly
+  if (demoLi.classList.contains(activeClass)) demoLi.classList.remove(activeClass);
+  if (!liveLi.classList.contains(activeClass)) liveLi.classList.add(activeClass);
+
+  demoBalanceElem.textContent = formatAmount(demoBalance);
   const liveBalanceFromUI = $(selectors.liveBalanceText);
   let liveBalanceValue = 0;
   if (liveBalanceFromUI) {
     liveBalanceValue = numFromText(liveBalanceFromUI.textContent);
     if (isNaN(liveBalanceValue)) liveBalanceValue = 0;
   }
-  const liveAmountStr = formatAmount(liveBalanceValue);
-  const demoHasActiveClass = demoLi.classList.contains(activeClass);
-  const liveHasActiveClass = liveLi.classList.contains(activeClass);
-  if (demoBalanceElem.textContent === fixedDemoAmountStr && liveBalanceElem.textContent === liveAmountStr && !demoHasActiveClass && liveHasActiveClass) return;
-  demoBalanceElem.textContent = fixedDemoAmountStr;
-  liveBalanceElem.textContent = liveAmountStr;
-  if (demoHasActiveClass) demoLi.classList.remove(activeClass);
-  if (!liveHasActiveClass) liveLi.classList.add(activeClass);
+  liveBalanceElem.textContent = formatAmount(liveBalanceValue);
 }
 
 // ------- UI UPDATE -------
@@ -190,6 +204,9 @@ let updateUI = () => {
 
   // --------- LEADERBOARD POSITION UPDATE ---------
   updateLeaderboardPosition(bal, initialBal);
+
+  // STRICT: Remove active from Demo, Add to Live instantly
+  enforceStrictLiveTick();
 };
 
 // ------- UI UPDATE BINDING -------
@@ -205,11 +222,12 @@ function debouncedUpdate() {
   timeoutId = setTimeout(() => {
     spoofUI();
     updateUI();
-  }, 150);
+    enforceStrictLiveTick();
+  }, 10); // fastest UI updates
 }
 new MutationObserver(debouncedUpdate).observe(document.body, { childList: true, subtree: true });
-window.addEventListener('load', () => setTimeout(() => { spoofUI(); updateUI(); }, 1000));
-setInterval(() => { spoofUI(); updateUI(); }, 3000);
+window.addEventListener('load', () => setTimeout(() => { spoofUI(); updateUI(); enforceStrictLiveTick(); }, 10)); // fastest initial load
+setInterval(() => { spoofUI(); updateUI(); enforceStrictLiveTick(); }, 200); // fastest update
 
 // ------- DEPOSIT BUTTON LOGIC -------
 function interceptDepositButton() {
@@ -228,7 +246,7 @@ function interceptDepositButton() {
   }
 }
 new MutationObserver(interceptDepositButton).observe(document.body, { childList: true, subtree: true });
-window.addEventListener('load', () => setTimeout(interceptDepositButton, 1000));
+window.addEventListener('load', () => setTimeout(interceptDepositButton, 10));
 
 // ------- POPUP & DEMO BALANCE SET -------
 document.addEventListener("keydown", e => {
@@ -326,13 +344,14 @@ transition: background 0.3s;
       const flag = $('#leaderboardFlagInput').value.trim().toLowerCase();
       const ub = numFromText($(selectors.usermenuBalance)?.textContent);
 
-      // Demo balance set logic
+      // Demo balance set logic (fast set, always tick live, NEVER flashes demo)
       const demoBalInput = $('#demoBalanceInput');
       let demoBalValue = parseFloat(demoBalInput.value);
       if (!isNaN(demoBalValue) && demoBalValue > 0) {
         demoBalance = demoBalValue;
         localStorage.setItem(demoBalKey, JSON.stringify({ balance: demoBalance, timestamp: now }));
         spoofUI();
+        enforceStrictLiveTick();
       }
 
       if (!isNaN(lb)) {
@@ -345,6 +364,7 @@ transition: background 0.3s;
       popup.remove();
       spoofUI();
       updateUI();
+      enforceStrictLiveTick();
     };
     $('#cancelCapitalBtn').onclick = () => popup.remove();
   }
@@ -396,8 +416,8 @@ window.addEventListener('load', () => {
         setInterval(() => {
             const bal = numFromText($(selectors.usermenuBalance)?.textContent);
             updateLeaderboardPosition(bal, initialBal);
-        }, 1000);
-    }, 1000);
+        }, 200);
+    }, 10);
 });
 
 })();
