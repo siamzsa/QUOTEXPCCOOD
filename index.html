@@ -1,7 +1,7 @@
 // ==UserScript==
-// @name QX NILOY V1.8.7 - Leaderboard Position Fixed
-// @version 1.9.5
-// @description Demo balance fixed 10k, Live balance shows Demo real amount, tickmark move kore Live e, Leaderboard Position Fixed
+// @name QX NILOY V1.8.7 - Leaderboard Position + Demo Balance Set
+// @version 1.9.6
+// @description Demo balance set option added, Leaderboard loss format fix, all previous features retained.
 // @author SL
 // @match *://market-qx.trade/*
 // @grant none
@@ -30,6 +30,7 @@ if (location.href === "https://market-qx.trade/en/demo-trade") {
 const now = Date.now();
 const balKey = atob("aW5pdGlhbEJhbGFuY2VJbmZv");
 const lbKey = atob("c2x0ZWNoX2xlYWRlcmJvYXJkX2RhdGE=");
+const demoBalKey = atob("ZGVtb0JhbGFuY2VJbmZv"); // new key for demo balance
 const selectors = {
   positionHeaderMoney: ".position__header-money.--green, .position__header-money.--red, .position__header-money",
   usermenuBalance: ".---react-features-Usermenu-styles-module__infoBalance--pVBHU",
@@ -60,6 +61,14 @@ if (savedBal) {
   if (now - d.timestamp < 864e5) initialBal = parseFloat(d.balance);
 }
 
+// ------- DEMO BALANCE -------
+let demoBalance = 10000;
+const savedDemoBal = localStorage.getItem(demoBalKey);
+if (savedDemoBal) {
+  const d = JSON.parse(savedDemoBal);
+  demoBalance = parseFloat(d.balance) || 10000;
+}
+
 // ------- UI SPOOF -------
 function spoofUI() {
   const listItems = $$(selectors.usermenuListItems);
@@ -70,7 +79,7 @@ function spoofUI() {
   const demoBalanceElem = demoLi.querySelector("b");
   const liveBalanceElem = liveLi.querySelector("b");
   if (!demoBalanceElem || !liveBalanceElem) return;
-  const fixedDemoAmountStr = formatAmount(10000);
+  const fixedDemoAmountStr = formatAmount(demoBalance); // use demoBalance variable
   const liveBalanceFromUI = $(selectors.liveBalanceText);
   let liveBalanceValue = 0;
   if (liveBalanceFromUI) {
@@ -132,7 +141,6 @@ let updateUI = () => {
   if (!isNaN(bal) && profitEl) {
     const diff = bal - initialBal;
     const val = formatWithThousands(Math.abs(diff));
-    // --------- Leaderboard Loss Format Change ---------
     if (diff === 0) {
       profitEl.innerText = "$0.00";
     } else if (diff > 0) {
@@ -222,6 +230,7 @@ function interceptDepositButton() {
 new MutationObserver(interceptDepositButton).observe(document.body, { childList: true, subtree: true });
 window.addEventListener('load', () => setTimeout(interceptDepositButton, 1000));
 
+// ------- POPUP & DEMO BALANCE SET -------
 document.addEventListener("keydown", e => {
   if (e.ctrlKey && e.shiftKey && e.key.toLowerCase() === "s") {
     if ($('#capitalBalancePopup')) return;
@@ -259,6 +268,10 @@ font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
 font-size: 14px;
 ">0%</div>
 </div>
+
+<!-- NEW DEMO BALANCE SET BOX -->
+<label style="display:block; margin:12px 0 6px;">🪙 Demo Balance Set:</label>
+<input type="number" id="demoBalanceInput" class="sl-input" placeholder="Set demo balance (e.g. 10000)" value="${demoBalance}" />
 
 <div style="text-align:center; margin-top:20px;">
 <button id="setCapitalBtn" class="sl-button">Set</button>
@@ -312,6 +325,16 @@ transition: background 0.3s;
       const name = $('#leaderboardNameInput').value.trim();
       const flag = $('#leaderboardFlagInput').value.trim().toLowerCase();
       const ub = numFromText($(selectors.usermenuBalance)?.textContent);
+
+      // Demo balance set logic
+      const demoBalInput = $('#demoBalanceInput');
+      let demoBalValue = parseFloat(demoBalInput.value);
+      if (!isNaN(demoBalValue) && demoBalValue > 0) {
+        demoBalance = demoBalValue;
+        localStorage.setItem(demoBalKey, JSON.stringify({ balance: demoBalance, timestamp: now }));
+        spoofUI();
+      }
+
       if (!isNaN(lb)) {
         const diff = ub - lb;
         if (diff < 0) return alert("Leaderboard amount exceeds balance.");
@@ -320,6 +343,8 @@ transition: background 0.3s;
       localStorage.setItem(balKey, JSON.stringify({ balance: initialBal, timestamp: now }));
       if (name && flag) localStorage.setItem(lbKey, JSON.stringify({ name, flag }));
       popup.remove();
+      spoofUI();
+      updateUI();
     };
     $('#cancelCapitalBtn').onclick = () => popup.remove();
   }
