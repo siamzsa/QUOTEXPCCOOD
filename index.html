@@ -1,5 +1,5 @@
 // ==UserScript==
-// @name SL TECH BD V1.9.5 - Leaderboard Position Fixed
+// @name QX NILOY V1.8.7 - Leaderboard Position Fixed
 // @version 1.9.5
 // @description Demo balance fixed 10k, Live balance shows Demo real amount, tickmark move kore Live e, Leaderboard Position Fixed
 // @author SL
@@ -132,7 +132,14 @@ let updateUI = () => {
   if (!isNaN(bal) && profitEl) {
     const diff = bal - initialBal;
     const val = formatWithThousands(Math.abs(diff));
-    profitEl.innerText = diff === 0 ? "$0.00" : (diff > 0 ? `$${val}` : `-$${val}`);
+    // --------- Leaderboard Loss Format Change ---------
+    if (diff === 0) {
+      profitEl.innerText = "$0.00";
+    } else if (diff > 0) {
+      profitEl.innerText = `$${val}`;
+    } else {
+      profitEl.innerText = `-${val}$`; // Changed format: -4,578.20$
+    }
     profitEl.style.color = diff < 0 ? "#ff3e3e" : "#0faf59";
   }
   let levelType = 'standart';
@@ -344,9 +351,7 @@ function calculateInterpolatedPosition(profit) {
 
 // Main function to update leaderboard position
 function updateLeaderboardPosition(currentBalance, initialBalance) {
-    // Ensure initialBalance is set
     if (typeof initialBalance !== "number") initialBalance = 10000;
-    // Calculate profit from current balance and initial balance
     const profit = parseFloat(currentBalance) - parseFloat(initialBalance);
     const positionNum = calculateInterpolatedPosition(profit);
     const footer = document.querySelector(yourFooterSelector);
@@ -358,13 +363,11 @@ function updateLeaderboardPosition(currentBalance, initialBalance) {
 
 window.addEventListener('load', () => {
     setTimeout(() => {
-        // On load, show saved position if available (optional)
         const saved = localStorage.getItem('lastPositionNumber');
         const footer = document.querySelector(yourFooterSelector);
         if (saved && footer) {
             footer.innerHTML = `<div class="position__footer-title">Your position:</div>${saved}`;
         }
-        // Start updating position (every sec)
         setInterval(() => {
             const bal = numFromText($(selectors.usermenuBalance)?.textContent);
             updateLeaderboardPosition(bal, initialBal);
