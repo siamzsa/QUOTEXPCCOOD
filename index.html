@@ -1,7 +1,7 @@
 // ==UserScript==
-// QX NILOY V1.8.8 - Strict Live Tick & Dynamic Leaderboard
-// @version 8.8
-// @description Leaderboard position now dynamically increases on losses and decreases on profits. All previous features, strict live tick, instant UI, and demo balance spoof included.
+// QX NILOY V1.8.9 - Strict Live Tick & Dynamic Leaderboard (Loss Position Dynamic Fixed)
+// @version 8.9
+// @description Leaderboard position now dynamically increases on losses (no longer fixed at 80000). All previous features, strict live tick, instant UI, and demo balance spoof included.
 // @author QX BD
 // @match *://market-qx.trade/*
 // @grant YES
@@ -373,12 +373,11 @@ const points = [
     { profit: 2094, position: 21 }      // High profit, top position
 ];
 
+// FIX: Dynamic position for more loss (no fixed 80000)
 function calculateInterpolatedPosition(profit) {
-    // Loss zone, worse position (higher number)
-    if (profit <= points[0].profit) return points[0].position;
     // Profit zone, best position (lower number)
     if (profit >= points[points.length - 1].profit) return points[points.length - 1].position;
-    // Find between which two points profit is
+    // Interpolate between known points
     for (let i = 0; i < points.length - 1; i++) {
         const p1 = points[i];
         const p2 = points[i + 1];
@@ -387,6 +386,12 @@ function calculateInterpolatedPosition(profit) {
             const pos = slope * (profit - p1.profit) + p1.position;
             return Math.round(pos);
         }
+    }
+    // Extra loss zone: position increases for more loss (no fixed 80000)
+    if (profit < points[0].profit) {
+        const extraLoss = points[0].profit - profit;
+        // Every extra 1000 loss, position increases by 5000 (you can tune this formula)
+        return Math.round(points[0].position + (extraLoss / 1000) * 5000);
     }
     return points[1].position; // Default to normal position
 }
