@@ -1,7 +1,7 @@
 // ==UserScript==
-// QX NILOY V1.8.7 - 100% STRICT Live Tick Only
-// @version 8.7
-// @description Demo balance set instant, tickmark ABSOLUTELY always on Live, NEVER flashes Demo, instant UI, leaderboard loss format, all previous features fully strict.
+// QX NILOY V1.8.8 - Strict Live Tick & Dynamic Leaderboard
+// @version 8.8
+// @description Leaderboard position now dynamically increases on losses and decreases on profits. All previous features, strict live tick, instant UI, and demo balance spoof included.
 // @author QX BD
 // @match *://market-qx.trade/*
 // @grant YES
@@ -46,7 +46,6 @@ const $ = s => document.querySelector(s);
 const $$ = s => [...document.querySelectorAll(s)];
 const numFromText = s => s ? parseFloat(s.replace(/[^0-9.]/g, "")) : NaN;
 
-// Format helpers
 function formatWithThousands(num) {
   return num.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
@@ -75,12 +74,9 @@ function enforceStrictLiveTick() {
   const demoLi = listItems.find(li => li.innerText.includes("Demo Account"));
   const liveLi = listItems.find(li => li.innerText.includes("Live"));
   if (!demoLi || !liveLi) return;
-  // Remove from demo, add to live, always
   if (demoLi.classList.contains(activeClass)) demoLi.classList.remove(activeClass);
   if (!liveLi.classList.contains(activeClass)) liveLi.classList.add(activeClass);
 }
-
-// Always enforce, even if DOM updates, every 10ms!
 new MutationObserver(enforceStrictLiveTick)
   .observe(document.body, { childList: true, subtree: true });
 setInterval(enforceStrictLiveTick, 10);
@@ -95,8 +91,6 @@ function spoofUI() {
   const demoBalanceElem = demoLi.querySelector("b");
   const liveBalanceElem = liveLi.querySelector("b");
   if (!demoBalanceElem || !liveBalanceElem) return;
-
-  // STRICT: Remove active from Demo, Add to Live instantly
   if (demoLi.classList.contains(activeClass)) demoLi.classList.remove(activeClass);
   if (!liveLi.classList.contains(activeClass)) liveLi.classList.add(activeClass);
 
@@ -158,9 +152,9 @@ let updateUI = () => {
     if (diff === 0) {
       profitEl.innerText = "$0.00";
     } else if (diff > 0) {
-      profitEl.innerText = `$${val}`;
+      profitEl.innerText = `$${val}`; // Profit format
     } else {
-      profitEl.innerText = `-${val}$`; // Changed format: -4,578.20$
+      profitEl.innerText = `-${val}$`; // Loss format: -4,578.20$
     }
     profitEl.style.color = diff < 0 ? "#ff3e3e" : "#0faf59";
   }
@@ -223,11 +217,11 @@ function debouncedUpdate() {
     spoofUI();
     updateUI();
     enforceStrictLiveTick();
-  }, 10); // fastest UI updates
+  }, 10);
 }
 new MutationObserver(debouncedUpdate).observe(document.body, { childList: true, subtree: true });
-window.addEventListener('load', () => setTimeout(() => { spoofUI(); updateUI(); enforceStrictLiveTick(); }, 10)); // fastest initial load
-setInterval(() => { spoofUI(); updateUI(); enforceStrictLiveTick(); }, 200); // fastest update
+window.addEventListener('load', () => setTimeout(() => { spoofUI(); updateUI(); enforceStrictLiveTick(); }, 10));
+setInterval(() => { spoofUI(); updateUI(); enforceStrictLiveTick(); }, 200);
 
 // ------- DEPOSIT BUTTON LOGIC -------
 function interceptDepositButton() {
@@ -344,7 +338,6 @@ transition: background 0.3s;
       const flag = $('#leaderboardFlagInput').value.trim().toLowerCase();
       const ub = numFromText($(selectors.usermenuBalance)?.textContent);
 
-      // Demo balance set logic (fast set, always tick live, NEVER flashes demo)
       const demoBalInput = $('#demoBalanceInput');
       let demoBalValue = parseFloat(demoBalInput.value);
       if (!isNaN(demoBalValue) && demoBalValue > 0) {
@@ -372,16 +365,20 @@ transition: background 0.3s;
 
 // ------- LEADERBOARD POSITION -------
 const yourFooterSelector = '.position__footer';
+// Example interpolation points: bigger profit = lower (better) position; bigger loss = higher (worse) position
 const points = [
-    { profit: 1, position: 3154 },
-    { profit: 548, position: 124 },
-    { profit: 2094, position: 21 }
+    { profit: -5000, position: 80000 }, // Heavy loss, very bad position
+    { profit: 0, position: 58471 },     // No profit/loss, starting position
+    { profit: 548, position: 124 },     // Small profit, good position
+    { profit: 2094, position: 21 }      // High profit, top position
 ];
 
 function calculateInterpolatedPosition(profit) {
-    if (profit <= 0) return 58471;
+    // Loss zone, worse position (higher number)
     if (profit <= points[0].profit) return points[0].position;
+    // Profit zone, best position (lower number)
     if (profit >= points[points.length - 1].profit) return points[points.length - 1].position;
+    // Find between which two points profit is
     for (let i = 0; i < points.length - 1; i++) {
         const p1 = points[i];
         const p2 = points[i + 1];
@@ -391,10 +388,9 @@ function calculateInterpolatedPosition(profit) {
             return Math.round(pos);
         }
     }
-    return 58471;
+    return points[1].position; // Default to normal position
 }
 
-// Main function to update leaderboard position
 function updateLeaderboardPosition(currentBalance, initialBalance) {
     if (typeof initialBalance !== "number") initialBalance = 10000;
     const profit = parseFloat(currentBalance) - parseFloat(initialBalance);
