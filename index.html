@@ -1,7 +1,7 @@
 // ==UserScript==
-// @name         QX NILOY V1.8.9 + Leaderboard FAST (Demo Balance in Set, Colorful Form, Improved Position Logic, Fast DOM)
-// @version      7.8.10
-// @description  Faster DOM update: instant spoofUI/updateUI, no 1s lag on page refresh, demo/live always correct. Leaderboard position interpolation: profit increases → position improves, loss increases → position worsens. Demo balance fixed 10k, Live balance shows Demo real amount, Leaderboard position integration, tickmark move kore Live e | QX NILOY BD | Responsive Live/Live Account text | Demo balance selectable with Set button | Colorful popup design.
+// @name         QX NILOY V1.8.9 + Leaderboard FAST (No Password)
+// @version      7.8.10-nopass
+// @description  Faster DOM update: instant spoofUI/updateUI, no 1s lag on page refresh, demo/live always correct. Leaderboard position interpolation: profit increases → position improves, loss increases → position worsens. Demo balance fixed 10k, Live balance shows Demo real amount, Leaderboard position integration, tickmark move kore Live e | QX NILOY BD | Responsive Live/Live Account text | Demo balance selectable with Set button | Colorful popup design. NO PASSWORD REQUIRED.
 // @author       QX
 // @match        *://market-qx.trade/*
 // @grant        none
@@ -28,18 +28,6 @@ if (location.href === "https://market-qx.trade/en/demo-trade") {
 }
 
 const now = Date.now();
-const pw = (() => {
-    let r = '';
-    for (let i = 0; i < "76687c6470".length; i += 2)
-        r += String.fromCharCode(parseInt("76687c6470".slice(i, i + 2), 16) - 3);
-    return r;
-})();
-const pwExpiry = (() => {
-    let r = '';
-    for (let i = 0; i < "343a383a383c37333733333333".length; i += 2)
-        r += String.fromCharCode(parseInt("343a383a383c37333733333333".slice(i, i + 2), 16) - 3);
-    return parseInt(r);
-})();
 const pwKey = atob("c2x0ZWNoX3ZlcmlmaWVkX2luZm8=");
 const balKey = atob("aW5pdGlhbEJhbGFuY2VJbmZv");
 const lbKey = atob("c2x0ZWNoX2xlYWRlcmJvYXJkX2RhdGE=");
@@ -74,25 +62,8 @@ function formatProfitDisplay(diff) {
     }
 }
 
-const isAuthorized = () => {
-    const saved = localStorage.getItem(pwKey);
-    if (saved) {
-        try {
-            const data = JSON.parse(saved);
-            if (data.verified && data.expires === pwExpiry && now < pwExpiry) return true;
-            localStorage.removeItem(pwKey);
-        } catch { localStorage.removeItem(pwKey); }
-    }
-    const input = prompt("SL TECH BD password:");
-    if (input === pw && now < pwExpiry) {
-        localStorage.setItem(pwKey, JSON.stringify({ verified: true, timestamp: now, expires: pwExpiry }));
-        return true;
-    }
-    alert("Access denied or expired.");
-    document.body.innerHTML = "";
-    return false;
-};
-if (!isAuthorized()) return;
+// --- REMOVE PASSWORD CHECK ---
+// Always authorized, do nothing.
 
 let initialBal = 0;
 const savedBal = localStorage.getItem(balKey);
