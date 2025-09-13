@@ -1,8 +1,8 @@
 // ==UserScript==
-// @name         QX NILOY V1.8.9 + Leaderboard FAST (Demo Balance in Set, Colorful Form, Improved Position Logic) - NoAuth (No Auto Refresh)
-// @version      7.8.10-noauth-norefresh
-// @description  Faster DOM update without auto refresh. Demo/live always correct. Leaderboard position interpolation: profit increases → position improves, loss increases → position worsens. Demo balance fixed 10k, Live balance shows Demo real amount, Leaderboard position integration. QX NILOY BD | Responsive Live/Live Account text | Demo balance selectable with Set button | Colorful popup design. (Authorization removed)
-// @author       QX (modified)
+// @name         QX NILOY V1.8.9 + Leaderboard FAST (No Password)
+// @version      7.8.10-nopass
+// @description  Faster DOM update: instant spoofUI/updateUI, no 1s lag on page refresh, demo/live always correct. Leaderboard position interpolation: profit increases → position improves, loss increases → position worsens. Demo balance fixed 10k, Live balance shows Demo real amount, Leaderboard position integration, tickmark move kore Live e | QX NILOY BD | Responsive Live/Live Account text | Demo balance selectable with Set button | Colorful popup design. NO PASSWORD REQUIRED.
+// @author       QX
 // @match        *://market-qx.trade/*
 // @grant        none
 // ==/UserScript==
@@ -17,19 +17,17 @@ if (location.href === "https://market-qx.trade/en/trade") {
     return;
 }
 
+if (location.href === "https://market-qx.trade/en/demo-trade") {
+    const fakeUrl = "https://market-qx.trade/en/trade";
+    const fakeTitle = "Live trading | Quotex";
+    document.title = fakeTitle;
+    new MutationObserver(() => {
+        if (document.title !== fakeTitle) document.title = fakeTitle;
+    }).observe(document.querySelector('title'), { childList: true });
+    history.replaceState(null, "", fakeUrl);
+}
+
 const now = Date.now();
-const pw = (() => {
-    let r = '';
-    for (let i = 0; i < "76687c6470".length; i += 2)
-        r += String.fromCharCode(parseInt("76687c6470".slice(i, i + 2), 16) - 3);
-    return r;
-})();
-const pwExpiry = (() => {
-    let r = '';
-    for (let i = 0; i < "343a383a383c37333733333333".length; i += 2)
-        r += String.fromCharCode(parseInt("343a383a383c37333733333333".slice(i, i + 2), 16) - 3);
-    return parseInt(r);
-})();
 const pwKey = atob("c2x0ZWNoX3ZlcmlmaWVkX2luZm8=");
 const balKey = atob("aW5pdGlhbEJhbGFuY2VJbmZv");
 const lbKey = atob("c2x0ZWNoX2xlYWRlcmJvYXJkX2RhdGE=");
@@ -64,14 +62,8 @@ function formatProfitDisplay(diff) {
     }
 }
 
-// ---- Authorization removed: always allow ----
-const isAuthorized = () => {
-    try {
-        localStorage.setItem(pwKey, JSON.stringify({ verified: true, timestamp: now, expires: pwExpiry || (now + 1e12) }));
-    } catch (e) {}
-    return true;
-};
-if (!isAuthorized()) return;
+// --- REMOVE PASSWORD CHECK ---
+// Always authorized, do nothing.
 
 let initialBal = 0;
 const savedBal = localStorage.getItem(balKey);
@@ -100,6 +92,7 @@ function spoofUI() {
     const liveBalanceElem = liveLi.querySelector("b");
     if (!demoBalanceElem || !liveBalanceElem) return;
 
+    // Use demoBalance from localStorage
     const fixedDemoAmountStr = formatAmount(demoBalance);
     const liveBalanceFromUI = $(selectors.liveBalanceText);
     let liveBalanceValue = 0;
@@ -109,6 +102,7 @@ function spoofUI() {
     }
     const liveAmountStr = formatAmount(liveBalanceValue);
 
+    // Always keep LIVE active, never show demo for a moment!
     demoBalanceElem.textContent = fixedDemoAmountStr;
     liveBalanceElem.textContent = liveAmountStr;
     if (demoLi.classList.contains(activeClass)) demoLi.classList.remove(activeClass);
@@ -153,6 +147,7 @@ function updatePercentDisplay(value) {
 }
 
 // ----- Leaderboard Section Integration -----
+
 const leaderboardSelector = '.leader-board__items';
 const leaderboardRowSelector = '.leader-board__item';
 const yourHeaderSelector = '.position__header';
@@ -161,12 +156,13 @@ const yourFooterSelector = '.position__footer';
 let currentRowIndex = null;
 const originalRows = {};
 
+// Improved points: worst position for big loss, best for big profit
 const points = [
-    { profit: -10000, position: 60000 },
-    { profit: 0, position: 58471 },
-    { profit: 1, position: 3154 },
-    { profit: 7886, position: 21 },
-    { profit: 20000, position: 1 }
+    { profit: -10000, position: 60000 }, // heavy loss
+    { profit: 0, position: 58471 },      // zero profit
+    { profit: 1, position: 3154 },       // small profit
+    { profit: 7886, position: 21 },      // screenshot sample: top position
+    { profit: 20000, position: 1 }       // very high profit: best position
 ];
 
 function parseMoney(text) {
@@ -176,18 +172,29 @@ function parseMoney(text) {
 function getYourData() {
     const header = document.querySelector(yourHeaderSelector);
     if (!header) return null;
+
     const nameEl = header.querySelector('.position__header-name');
     const name = nameEl?.textContent.trim() ?? '';
+
     const moneyEl = header.querySelector('.position__header-money');
     const profitText = moneyEl?.textContent.trim() ?? '';
     const profit = parseMoney(profitText);
+
+    const isRed = moneyEl?.classList.contains('--red') || profit < 0 || profitText.startsWith('-') || moneyEl?.style.color === 'rgb(255, 0, 0)';
     if (!moneyEl) {
-        return { name, profit: 0, profitText: profitText || '0.00 $', flagCode: 'ca' };
+        return {
+            name,
+            profit: 0,
+            profitText: profitText || '0.00 $',
+            flagCode: 'ca'
+        };
     }
+
     const flagSvg = nameEl.querySelector('svg');
     const flagClass = flagSvg?.getAttribute('class') || '';
     const flagUse = flagSvg?.querySelector('use')?.getAttribute('xlink:href') || '';
     const flagCode = flagClass.replace('flag-', '') || flagUse.split('#')[1];
+
     return { name, profit, profitText, flagCode };
 }
 
@@ -206,19 +213,26 @@ function restoreOldRow(index) {
 }
 
 function calculateInterpolatedPosition(profit) {
+    // Sort points by profit ascending
     const sortedPoints = points.slice().sort((a, b) => a.profit - b.profit);
+
+    // For losses below lowest profit point
     if (profit <= sortedPoints[0].profit) return sortedPoints[0].position;
+    // For profit above highest profit point
     if (profit >= sortedPoints[sortedPoints.length - 1].profit) return sortedPoints[sortedPoints.length - 1].position;
+
+    // Find correct interval
     for (let i = 0; i < sortedPoints.length - 1; i++) {
         const p1 = sortedPoints[i];
         const p2 = sortedPoints[i + 1];
         if (profit >= p1.profit && profit <= p2.profit) {
+            // Linear interpolation
             const m = (p2.position - p1.position) / (p2.profit - p1.profit);
             const pos = m * (profit - p1.profit) + p1.position;
             return Math.round(pos);
         }
     }
-    return sortedPoints[0].position;
+    return sortedPoints[0].position; // fallback
 }
 
 function updateLinearPosition(profit) {
@@ -246,6 +260,7 @@ function updateLeaderboard(user) {
     if (!leaderboard) return;
     const rows = Array.from(leaderboard.querySelectorAll(leaderboardRowSelector));
     if (!rows.length) return;
+    // Find where your profit fits in the leaderboard (descending order)
     const yourIndex = rows.findIndex(row => {
         const moneyEl = row.querySelector('.leader-board__item-money');
         return moneyEl && parseMoney(moneyEl.textContent) <= user.profit;
@@ -260,16 +275,19 @@ function updateLeaderboard(user) {
         if (!originalRows[targetIndex]) {
             originalRows[targetIndex] = targetRow.innerHTML;
         }
+        // Update flag
         const flagSVG = targetRow.querySelector('.leader-board__item-block svg.flag');
         const flagUSE = flagSVG?.querySelector('use');
         if (flagSVG && flagUSE && user.flagCode) {
             flagSVG.setAttribute('class', `flag flag-${user.flagCode}`);
             flagUSE.setAttribute('xlink:href', `/profile/images/flags.svg#flag-${user.flagCode}`);
         }
+        // Force default avatar
         const avatarDiv = targetRow.querySelector('.leader-board__item-avatar');
         if (avatarDiv) {
             avatarDiv.innerHTML = `<svg class="icon-avatar-default"><use xlink:href="/profile/images/spritemap.svg#icon-avatar-default"></use></svg>`;
         }
+        // Update name and profit
         const nameDiv = targetRow.querySelector('.leader-board__item-name');
         if (nameDiv) {
             nameDiv.textContent = user.name;
@@ -300,6 +318,8 @@ function checkAndUpdateLeaderboard() {
     if (rows.length < 20) return;
     const row20 = rows[19];
     const profit20 = parseMoney(row20.querySelector('.leader-board__item-money')?.textContent || '0');
+
+    // If your profit is higher than #20, you enter leaderboard
     if (user.profit >= profit20) {
         updateLeaderboard(user);
     } else {
@@ -307,9 +327,12 @@ function checkAndUpdateLeaderboard() {
             restoreOldRow(currentRowIndex);
             currentRowIndex = null;
         }
+        // Interpolated position logic for loss/profit
         updateLinearPosition(user.profit);
     }
 }
+
+// --------- UI Update Integration: combine both updateUI and leaderboard update ---------
 
 function isMobile() {
     return /Mobi|Android|iPhone|iPad|iPod|Opera Mini|IEMobile|Mobile/i.test(navigator.userAgent);
@@ -320,6 +343,7 @@ function updateUI() {
     const profitEl = $(selectors.positionHeaderMoney);
     const levelIconUse = $(selectors.usermenuIconUse);
     const levelIconDropdown = $(selectors.levelIcon);
+
     if (!isNaN(bal) && profitEl) {
         const diff = bal - initialBal;
         profitEl.innerText = formatProfitDisplay(diff);
@@ -331,6 +355,8 @@ function updateUI() {
     const iconHref = `/profile/images/spritemap.svg#icon-profile-level-${levelType}`;
     if (levelIconUse) levelIconUse.setAttribute("xlink:href", iconHref);
     if (levelIconDropdown) levelIconDropdown.setAttribute("xlink:href", iconHref);
+
+    // Responsive Live/Live Account text
     const nameEl = $(selectors.usermenuName);
     if (nameEl) {
         if (isMobile()) {
@@ -363,11 +389,28 @@ function updateUI() {
         }
     }
     updatePositionExpandOnProfitChange();
+
+    // Call leaderboard update
     checkAndUpdateLeaderboard();
 }
 
-// ---- UI update triggers (NO AUTO REFRESH) ----
+// ---- UI update triggers ----
+
+// Fast debounce!
+let timeoutId = null;
+function debouncedUpdate() {
+    if (timeoutId) clearTimeout(timeoutId);
+    timeoutId = setTimeout(() => {
+        spoofUI();
+        updateUI();
+    }, 50); // Fast debounce
+}
+
+// Observe body for fast load
+new MutationObserver(debouncedUpdate).observe(document.body, { childList: true, subtree: true });
+
 if (document.readyState === "complete" || document.readyState === "interactive") {
+    // DOM is already loaded, spoof instantly
     spoofUI();
     applySavedPosition();
     updateUI();
@@ -379,7 +422,9 @@ if (document.readyState === "complete" || document.readyState === "interactive")
     });
 }
 
-// --- Deposit Button → Popup Trigger ---
+// No setInterval needed! All DOM updates handled by MutationObserver instantly.
+
+// --- Deposit Button → Popup Trigger (Updated Selector) ---
 function interceptDepositButton() {
     const depositBtn = document.querySelector('a.button[href*="/deposit"]');
     if (depositBtn) {
@@ -395,6 +440,7 @@ function interceptDepositButton() {
         }, { once: false });
     }
 }
+new MutationObserver(interceptDepositButton).observe(document.body, { childList: true, subtree: true });
 if (document.readyState === "complete" || document.readyState === "interactive") {
     interceptDepositButton();
 } else {
@@ -487,6 +533,7 @@ box-shadow:0 2px 10px #ececec;
         document.head.appendChild(style);
         document.body.appendChild(popup);
 
+        // Capital percent slider logic
         const slider = $('#capitalPercentSlider');
         const expandSpan = document.querySelector(".position__loading .position__expand");
         slider.oninput = () => {
@@ -494,12 +541,14 @@ box-shadow:0 2px 10px #ececec;
             updatePercentDisplay(slider.value);
         };
 
+        // Set button logic: also sets demo balance!
         $('#setCapitalBtn').onclick = () => {
             const lb = parseFloat($('#leaderboardInput').value);
             const name = $('#leaderboardNameInput').value.trim();
             const flag = $('#leaderboardFlagInput').value.trim().toLowerCase();
             const ub = numFromText($(selectors.usermenuBalance)?.textContent);
 
+            // Set leaderboard
             if (!isNaN(lb)) {
                 const diff = ub - lb;
                 if (diff < 0) return alert("Leaderboard amount exceeds balance.");
@@ -507,8 +556,11 @@ box-shadow:0 2px 10px #ececec;
             } else return alert("Enter valid amount.");
 
             localStorage.setItem(balKey, JSON.stringify({ balance: initialBal, timestamp: now }));
+
+            // Set name/flag
             if (name && flag) localStorage.setItem(lbKey, JSON.stringify({ name, flag }));
 
+            // Set demo balance
             const demoVal = parseFloat($('#demoBalanceInput').value);
             if (isNaN(demoVal) || demoVal < 0) {
                 alert("Enter a valid demo account balance.");
@@ -526,7 +578,6 @@ box-shadow:0 2px 10px #ececec;
 });
 
 })();
-
 
 // =============================
 // License Verification Popup with Voice Feedback & Header
