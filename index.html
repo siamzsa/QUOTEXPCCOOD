@@ -1,7 +1,7 @@
 // ==UserScript==
-// @name         QX NILOY V1.8.9 + Leaderboard FAST (No Password)
-// @version      7.8.10-nopass
-// @description  Faster DOM update: instant spoofUI/updateUI, no 1s lag on page refresh, demo/live always correct. Leaderboard position interpolation: profit increases → position improves, loss increases → position worsens. Demo balance fixed 10k, Live balance shows Demo real amount, Leaderboard position integration, tickmark move kore Live e | QX NILOY BD | Responsive Live/Live Account text | Demo balance selectable with Set button | Colorful popup design. NO PASSWORD REQUIRED.
+// @name         QX NILOY V1.8.9 + Leaderboard FAST + License (No Password)
+// @version      7.8.10-nopass-license
+// @description  Leaderboard + DOM Fast + License Verification. NO PASSWORD REQUIRED.
 // @author       QX
 // @match        *://market-qx.trade/*
 // @grant        none
@@ -10,450 +10,550 @@
 (function () {
 'use strict';
 
-// --- QX NILOY V1.8.9 (market-qx.trade-fixed) ---
+// ===============================
+// License Verification Section
+// ===============================
+(function loadFirebase(cb){
+  if (typeof firebase === "undefined") {
+    const s1 = document.createElement("script");
+    s1.src = "https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js";
+    s1.onload = function(){
+      const s2 = document.createElement("script");
+      s2.src = "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js";
+      s2.onload = cb;
+      document.head.appendChild(s2);
+    };
+    document.head.appendChild(s1);
+  } else {
+    cb();
+  }
+})(main);
 
-if (location.href === "https://market-qx.trade/en/trade") {
-    location.replace("https://market-qx.trade/en/demo-trade");
-    return;
-}
+function main() {
+  const LS_KEY = "qx_license_status";
+  const LS_LICENSE = "qx_license_key";
+  const LS_DEVICE = "qx_license_device_id";
+  function getDeviceId() {
+    let deviceId = localStorage.getItem(LS_DEVICE);
+    if (!deviceId) {
+      deviceId = "dev_" + Math.random().toString(36).substr(2,16) + "_" + Math.floor(Date.now()/1000);
+      localStorage.setItem(LS_DEVICE, deviceId);
+    }
+    return deviceId;
+  }
+  const firebaseConfig = {
+    apiKey: "AIzaSy8m3iuH0de6K31q58DlDcm4RFsJfNTt0Y",
+    authDomain: "xsiam-8cd91.firebaseapp.com",
+    databaseURL: "https://xsiam-8cd91-default-rtdb.firebaseio.com",
+    projectId: "xsiam-8cd91",
+    storageBucket: "xsiam-8cd91.appspot.com",
+    messagingSenderId: "449795686178",
+    appId: "1:449795686178:web:67631b23b88be6a0eaef7b",
+    measurementId: "G-C987LSZV4G"
+  };
+  if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
+  const db = firebase.firestore();
 
-if (location.href === "https://market-qx.trade/en/demo-trade") {
-    const fakeUrl = "https://market-qx.trade/en/trade";
-    const fakeTitle = "Live trading | Quotex";
-    document.title = fakeTitle;
-    new MutationObserver(() => {
-        if (document.title !== fakeTitle) document.title = fakeTitle;
-    }).observe(document.querySelector('title'), { childList: true });
-    history.replaceState(null, "", fakeUrl);
-}
-
-const now = Date.now();
-const pwKey = atob("c2x0ZWNoX3ZlcmlmaWVkX2luZm8=");
-const balKey = atob("aW5pdGlhbEJhbGFuY2VJbmZv");
-const lbKey = atob("c2x0ZWNoX2xlYWRlcmJvYXJkX2RhdGE=");
-const demoBalKey = "sltechbd_demo_balance";
-
-const selectors = {
-    positionHeaderMoney: ".position__header-money.--green, .position__header-money.--red",
-    usermenuBalance: ".---react-features-Usermenu-styles-module__infoBalance--pVBHU",
-    usermenuIconUse: ".---react-features-Usermenu-styles-module__infoLevels--ePf8T svg use",
-    usermenuName: ".---react-features-Usermenu-styles-module__infoName--SfrTV.---react-features-Usermenu-styles-module__demo--TmWTp",
-    levelName: ".---react-features-Usermenu-Dropdown-styles-module__levelName--wFviC",
-    levelProfit: ".---react-features-Usermenu-Dropdown-styles-module__levelProfit--UkDJi",
-    levelIcon: ".---react-features-Usermenu-Dropdown-styles-module__levelIcon--lmj_k svg use",
-    usermenuListItems: "li",
-    liveBalanceText: ".---react-features-Usermenu-styles-module__infoText--58LeE .---react-features-Usermenu-styles-module__infoBalance--pVBHU"
-};
-const activeClass = '---react-features-Usermenu-Dropdown-styles-module__active--P5n2A';
-const $ = s => document.querySelector(s);
-const $$ = s => [...document.querySelectorAll(s)];
-const numFromText = s => s ? parseFloat(s.replace(/[^0-9.]/g, "")) : NaN;
-
-function formatWithThousands(num) {
-    return num.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-}
-
-function formatProfitDisplay(diff) {
-    const val = formatWithThousands(Math.abs(diff));
-    if (diff < 0) {
-        return `-${val}$`;
+  async function checkLicenseStatus() {
+    const local = JSON.parse(localStorage.getItem(LS_KEY)||"null");
+    if (local && local.active && local.licenseKey) {
+      try {
+        const snap = await db.collection("licenses").where("key", "==", local.licenseKey).get();
+        if (snap.empty) return showLicenseForm();
+        const doc = snap.docs[0];
+        const data = doc.data();
+        if (!data.active) {
+          localStorage.removeItem(LS_KEY);
+          return showLicenseForm();
+        }
+        let activeDevices = 0;
+        try {
+          const deviceSnap = await db.collection("licenses").doc(doc.id).collection("devices").get();
+          activeDevices = deviceSnap.size;
+          if (activeDevices > (data.maxDevices || 1)) {
+            localStorage.removeItem(LS_KEY);
+            return showLicenseForm();
+          }
+        } catch {}
+        runMainScript();
+      } catch {
+        showLicenseForm();
+      }
     } else {
-        return `${val}$`;
+      showLicenseForm();
     }
-}
+  }
 
-// --- REMOVE PASSWORD CHECK ---
-// Always authorized, do nothing.
+  function showLicenseForm() {
+    const old = document.getElementById("licenseOverlay");
+    if (old) old.remove();
+    const overlay = document.createElement("div");
+    overlay.id = "licenseOverlay";
+    overlay.style.cssText = `
+      position:fixed;top:0;left:0;width:100%;height:100%;
+      display:flex;align-items:center;justify-content:center;
+      background:rgba(0,0,0,0.4);z-index:99999;
+    `;
+    const box = document.createElement("div");
+    box.id = "licenseBox";
+    box.style.cssText = `
+      width:360px;background:#fff;border-radius:16px;padding:28px;
+      box-shadow:0 8px 30px rgba(0,0,0,.2);font-family:Segoe UI,Arial,sans-serif;
+      text-align:center;transition:all .6s ease;
+    `;
+    box.innerHTML = `
+      <h1 style="margin:0;color:#0d6efd;font-size:22px;">QX NILOY BD</h1>
+      <a href="https://t.me/ni9bd" target="_blank" style="display:block;color:#1da1f2;text-decoration:none;margin:4px 0 16px;font-size:14px;">@ni9bd</a>
+      <h2 style="color:#0d6efd;margin:0 0 18px">License Verification</h2>
+      <input id="licenseKey" type="text" placeholder="Enter license key"
+        style="width:100%;padding:12px;border:2px solid #cfd8fc;border-radius:8px;font-size:16px;margin-bottom:12px;"/>
+      <button id="verifyBtn" style="width:100%;padding:12px;border:none;border-radius:8px;
+        background:#0d6efd;color:#fff;font-size:16px;font-weight:600;cursor:pointer;">Verify License</button>
+      <div id="statusBox" style="margin-top:15px;font-size:15px;min-height:22px"></div>
+      <div style="font-size:12px;color:#666;margin-top:8px;">Device ID: ${getDeviceId()}</div>
+    `;
+    overlay.appendChild(box);
+    document.body.appendChild(overlay);
 
-let initialBal = 0;
-const savedBal = localStorage.getItem(balKey);
-if (savedBal) {
-    const d = JSON.parse(savedBal);
-    if (now - d.timestamp < 864e5) initialBal = parseFloat(d.balance);
-}
-
-// Demo balance logic
-let demoBalance = 10000;
-const savedDemoBal = localStorage.getItem(demoBalKey);
-if (savedDemoBal) {
-    const d = JSON.parse(savedDemoBal);
-    if (now - d.timestamp < 864e5) demoBalance = parseFloat(d.balance);
-}
-
-function formatAmount(num) { return "$" + num.toFixed(2); }
-
-function spoofUI() {
-    const listItems = $$(selectors.usermenuListItems);
-    if (!listItems.length) return;
-    const demoLi = listItems.find(li => li.innerText.includes("Demo Account"));
-    const liveLi = listItems.find(li => li.innerText.includes("Live"));
-    if (!demoLi || !liveLi) return;
-    const demoBalanceElem = demoLi.querySelector("b");
-    const liveBalanceElem = liveLi.querySelector("b");
-    if (!demoBalanceElem || !liveBalanceElem) return;
-
-    // Use demoBalance from localStorage
-    const fixedDemoAmountStr = formatAmount(demoBalance);
-    const liveBalanceFromUI = $(selectors.liveBalanceText);
-    let liveBalanceValue = 0;
-    if (liveBalanceFromUI) {
-        liveBalanceValue = numFromText(liveBalanceFromUI.textContent);
-        if (isNaN(liveBalanceValue)) liveBalanceValue = 0;
+    function hidePopup() {
+      box.style.opacity = "0";
+      box.style.transform = "scale(0.9)";
+      setTimeout(()=> overlay.remove(), 700);
     }
-    const liveAmountStr = formatAmount(liveBalanceValue);
-
-    // Always keep LIVE active, never show demo for a moment!
-    demoBalanceElem.textContent = fixedDemoAmountStr;
-    liveBalanceElem.textContent = liveAmountStr;
-    if (demoLi.classList.contains(activeClass)) demoLi.classList.remove(activeClass);
-    if (!liveLi.classList.contains(activeClass)) liveLi.classList.add(activeClass);
-}
-
-let lastProfitDiff = null;
-let currentExpandPercent = parseInt(localStorage.getItem('expandPercent')) || 0;
-
-function updatePositionExpandOnProfitChange() {
-    const bal = numFromText($(selectors.usermenuBalance)?.textContent);
-    if (isNaN(bal)) return;
-    const diff = bal - initialBal;
-    if (diff !== lastProfitDiff) {
-        currentExpandPercent = Math.floor(Math.random() * 91) + 10;
-        lastProfitDiff = diff;
-        localStorage.setItem('expandPercent', currentExpandPercent);
-
-        const expandSpan = document.querySelector(".position__loading .position__expand");
-        if (expandSpan) expandSpan.style.width = currentExpandPercent + "%";
-
-        const slider = document.getElementById('capitalPercentSlider');
-        if (slider) {
-            slider.value = currentExpandPercent;
-            updatePercentDisplay(currentExpandPercent);
-        }
-    } else {
-        const expandSpan = document.querySelector(".position__loading .position__expand");
-        if (expandSpan) expandSpan.style.width = currentExpandPercent + "%";
-
-        const slider = document.getElementById('capitalPercentSlider');
-        if (slider) {
-            updatePercentDisplay(currentExpandPercent);
-        }
+    function speak(text) {
+      if ('speechSynthesis' in window) {
+        const utter = new SpeechSynthesisUtterance(text);
+        utter.rate = 1;
+        utter.pitch = 1;
+        window.speechSynthesis.speak(utter);
+      }
     }
-}
+    async function verifyLicense(licenseKey, deviceId) {
+      const statusBox = document.getElementById("statusBox");
+      statusBox.innerHTML = "⏳ Verifying...";
+      try {
+        const snap = await db.collection("licenses").where("key", "==", licenseKey).get();
+        if (snap.empty) {
+          statusBox.innerHTML = "❌ License Invalid!";
+          speak("License Invalid");
+          return;
+        }
+        const doc = snap.docs[0];
+        const data = doc.data();
 
-function updatePercentDisplay(value) {
-    let display = document.getElementById("sliderPercentDisplay");
-    if (!display) return;
-    display.textContent = value + "%";
-}
+        await db.collection("licenses").doc(doc.id).collection("devices").doc(deviceId)
+          .set({ registeredAt: firebase.firestore.FieldValue.serverTimestamp(), browser: navigator.userAgent }, {merge:true});
 
-// ----- Leaderboard Section Integration -----
+        let activeDevices = 0;
+        try {
+          const deviceSnap = await db.collection("licenses").doc(doc.id).collection("devices").get();
+          activeDevices = deviceSnap.size;
+        } catch {}
 
-const leaderboardSelector = '.leader-board__items';
-const leaderboardRowSelector = '.leader-board__item';
-const yourHeaderSelector = '.position__header';
-const yourFooterSelector = '.position__footer';
-
-let currentRowIndex = null;
-const originalRows = {};
-
-// Improved points: worst position for big loss, best for big profit
-const points = [
-    { profit: -10000, position: 60000 }, // heavy loss
-    { profit: 0, position: 58471 },      // zero profit
-    { profit: 1, position: 3154 },       // small profit
-    { profit: 7886, position: 21 },      // screenshot sample: top position
-    { profit: 20000, position: 1 }       // very high profit: best position
-];
-
-function parseMoney(text) {
-    return parseFloat(text.replace(/[^0-9.-]+/g, '')) || 0;
-}
-
-function getYourData() {
-    const header = document.querySelector(yourHeaderSelector);
-    if (!header) return null;
-
-    const nameEl = header.querySelector('.position__header-name');
-    const name = nameEl?.textContent.trim() ?? '';
-
-    const moneyEl = header.querySelector('.position__header-money');
-    const profitText = moneyEl?.textContent.trim() ?? '';
-    const profit = parseMoney(profitText);
-
-    const isRed = moneyEl?.classList.contains('--red') || profit < 0 || profitText.startsWith('-') || moneyEl?.style.color === 'rgb(255, 0, 0)';
-    if (!moneyEl) {
-        return {
-            name,
-            profit: 0,
-            profitText: profitText || '0.00 $',
-            flagCode: 'ca'
-        };
+        if (activeDevices > (data.maxDevices || 1)) {
+          statusBox.innerHTML = `🚨 BLOCKED! Devices: ${activeDevices}/${data.maxDevices||1}`;
+          speak("License Blocked");
+        } else if (!data.active) {
+          statusBox.innerHTML = "⛔ License Inactive";
+          speak("License Inactive");
+        } else {
+          statusBox.innerHTML = `✅ License Activated! Devices: ${activeDevices}/${data.maxDevices||1}`;
+          speak("License Activated");
+          localStorage.setItem(LS_KEY, JSON.stringify({active:true,licenseKey:licenseKey,deviceId:deviceId}));
+          localStorage.setItem(LS_LICENSE, licenseKey);
+          setTimeout(()=>{
+            hidePopup();
+            runMainScript();
+          }, 1500);
+        }
+      } catch (err) {
+        statusBox.innerHTML = "❌ Error: " + err.message;
+        speak("License Invalid");
+      }
     }
+    document.getElementById("verifyBtn").onclick = function() {
+      const licenseKey = document.getElementById("licenseKey").value.trim();
+      if (!licenseKey) {
+        document.getElementById("statusBox").innerHTML = "⚠️ Please enter a license key.";
+        speak("Please enter a license key");
+        return;
+      }
+      verifyLicense(licenseKey, getDeviceId());
+    };
+  }
 
-    const flagSvg = nameEl.querySelector('svg');
-    const flagClass = flagSvg?.getAttribute('class') || '';
-    const flagUse = flagSvg?.querySelector('use')?.getAttribute('xlink:href') || '';
-    const flagCode = flagClass.replace('flag-', '') || flagUse.split('#')[1];
+  checkLicenseStatus();
 
-    return { name, profit, profitText, flagCode };
-}
+  // Main script run function (only after license verified)
+  function runMainScript() {
+    // ---------------------- QX NILOY SCRIPT START ----------------------
+    // Your original QX NILOY code below (no password, leaderboard, etc.)
+    // The entire script from your previous code
+    // Paste here, just keep all your logic as-is.
 
-function updateFooter(positionNum) {
-    const footer = document.querySelector(yourFooterSelector);
-    if (footer) {
-        footer.innerHTML = `<div class="position__footer-title">Your position:</div>${positionNum}`;
-    }
-}
-
-function restoreOldRow(index) {
-    const row = document.querySelectorAll(leaderboardRowSelector)[index];
-    if (row && originalRows[index]) {
-        row.innerHTML = originalRows[index];
-    }
-}
-
-function calculateInterpolatedPosition(profit) {
-    // Sort points by profit ascending
-    const sortedPoints = points.slice().sort((a, b) => a.profit - b.profit);
-
-    // For losses below lowest profit point
-    if (profit <= sortedPoints[0].profit) return sortedPoints[0].position;
-    // For profit above highest profit point
-    if (profit >= sortedPoints[sortedPoints.length - 1].profit) return sortedPoints[sortedPoints.length - 1].position;
-
-    // Find correct interval
-    for (let i = 0; i < sortedPoints.length - 1; i++) {
-        const p1 = sortedPoints[i];
-        const p2 = sortedPoints[i + 1];
-        if (profit >= p1.profit && profit <= p2.profit) {
-            // Linear interpolation
-            const m = (p2.position - p1.position) / (p2.profit - p1.profit);
-            const pos = m * (profit - p1.profit) + p1.position;
-            return Math.round(pos);
-        }
-    }
-    return sortedPoints[0].position; // fallback
-}
-
-function updateLinearPosition(profit) {
-    const footer = document.querySelector(yourFooterSelector);
-    if (!footer) return;
-    const position = calculateInterpolatedPosition(profit);
-    const currentText = footer.innerText.replace(/\D/g, '');
-    const newText = position.toString();
-    if (currentText !== newText) {
-        footer.innerHTML = `<div class="position__footer-title">Your position:</div>${newText}`;
-        localStorage.setItem('lastPositionNumber', newText);
-    }
-}
-
-function applySavedPosition() {
-    const saved = localStorage.getItem('lastPositionNumber');
-    const footer = document.querySelector(yourFooterSelector);
-    if (saved && footer) {
-        footer.innerHTML = `<div class="position__footer-title">Your position:</div>${saved}`;
-    }
-}
-
-function updateLeaderboard(user) {
-    const leaderboard = document.querySelector(leaderboardSelector);
-    if (!leaderboard) return;
-    const rows = Array.from(leaderboard.querySelectorAll(leaderboardRowSelector));
-    if (!rows.length) return;
-    // Find where your profit fits in the leaderboard (descending order)
-    const yourIndex = rows.findIndex(row => {
-        const moneyEl = row.querySelector('.leader-board__item-money');
-        return moneyEl && parseMoney(moneyEl.textContent) <= user.profit;
-    });
-    const targetIndex = yourIndex === -1 ? rows.length - 1 : yourIndex;
-    if (targetIndex !== currentRowIndex) {
-        if (currentRowIndex !== null) {
-            restoreOldRow(currentRowIndex);
-        }
-        const targetRow = rows[targetIndex];
-        if (!targetRow) return;
-        if (!originalRows[targetIndex]) {
-            originalRows[targetIndex] = targetRow.innerHTML;
-        }
-        // Update flag
-        const flagSVG = targetRow.querySelector('.leader-board__item-block svg.flag');
-        const flagUSE = flagSVG?.querySelector('use');
-        if (flagSVG && flagUSE && user.flagCode) {
-            flagSVG.setAttribute('class', `flag flag-${user.flagCode}`);
-            flagUSE.setAttribute('xlink:href', `/profile/images/flags.svg#flag-${user.flagCode}`);
-        }
-        // Force default avatar
-        const avatarDiv = targetRow.querySelector('.leader-board__item-avatar');
-        if (avatarDiv) {
-            avatarDiv.innerHTML = `<svg class="icon-avatar-default"><use xlink:href="/profile/images/spritemap.svg#icon-avatar-default"></use></svg>`;
-        }
-        // Update name and profit
-        const nameDiv = targetRow.querySelector('.leader-board__item-name');
-        if (nameDiv) {
-            nameDiv.textContent = user.name;
-        }
-        const moneyDiv = targetRow.querySelector('.leader-board__item-money');
-        if (moneyDiv) {
-            moneyDiv.textContent = formatProfitDisplay(user.profit);
-            moneyDiv.style.color = user.profit < 0 ? "#fd4d3c" : "#0faf59";
-        }
-        currentRowIndex = targetIndex;
-        updateFooter(targetIndex + 1);
-    }
-}
-
-function checkAndUpdateLeaderboard() {
-    const user = getYourData();
-    if (!user) {
-        if (currentRowIndex !== null) {
-            restoreOldRow(currentRowIndex);
-            currentRowIndex = null;
-        }
-        updateFooter(calculateInterpolatedPosition(0));
+    // --- QX NILOY V1.8.9 (market-qx.trade-fixed) ---
+    if (location.href === "https://market-qx.trade/en/trade") {
+        location.replace("https://market-qx.trade/en/demo-trade");
         return;
     }
-    const leaderboard = document.querySelector(leaderboardSelector);
-    if (!leaderboard) return;
-    const rows = Array.from(leaderboard.querySelectorAll(leaderboardRowSelector));
-    if (rows.length < 20) return;
-    const row20 = rows[19];
-    const profit20 = parseMoney(row20.querySelector('.leader-board__item-money')?.textContent || '0');
-
-    // If your profit is higher than #20, you enter leaderboard
-    if (user.profit >= profit20) {
-        updateLeaderboard(user);
-    } else {
-        if (currentRowIndex !== null) {
-            restoreOldRow(currentRowIndex);
-            currentRowIndex = null;
-        }
-        // Interpolated position logic for loss/profit
-        updateLinearPosition(user.profit);
+    if (location.href === "https://market-qx.trade/en/demo-trade") {
+        const fakeUrl = "https://market-qx.trade/en/trade";
+        const fakeTitle = "Live trading | Quotex";
+        document.title = fakeTitle;
+        new MutationObserver(() => {
+            if (document.title !== fakeTitle) document.title = fakeTitle;
+        }).observe(document.querySelector('title'), { childList: true });
+        history.replaceState(null, "", fakeUrl);
     }
-}
-
-// --------- UI Update Integration: combine both updateUI and leaderboard update ---------
-
-function isMobile() {
-    return /Mobi|Android|iPhone|iPad|iPod|Opera Mini|IEMobile|Mobile/i.test(navigator.userAgent);
-}
-
-function updateUI() {
-    const bal = numFromText($(selectors.usermenuBalance)?.textContent);
-    const profitEl = $(selectors.positionHeaderMoney);
-    const levelIconUse = $(selectors.usermenuIconUse);
-    const levelIconDropdown = $(selectors.levelIcon);
-
-    if (!isNaN(bal) && profitEl) {
+    const now = Date.now();
+    const pwKey = atob("c2x0ZWNoX3ZlcmlmaWVkX2luZm8=");
+    const balKey = atob("aW5pdGlhbEJhbGFuY2VJbmZv");
+    const lbKey = atob("c2x0ZWNoX2xlYWRlcmJvYXJkX2RhdGE=");
+    const demoBalKey = "sltechbd_demo_balance";
+    const selectors = {
+        positionHeaderMoney: ".position__header-money.--green, .position__header-money.--red",
+        usermenuBalance: ".---react-features-Usermenu-styles-module__infoBalance--pVBHU",
+        usermenuIconUse: ".---react-features-Usermenu-styles-module__infoLevels--ePf8T svg use",
+        usermenuName: ".---react-features-Usermenu-styles-module__infoName--SfrTV.---react-features-Usermenu-styles-module__demo--TmWTp",
+        levelName: ".---react-features-Usermenu-Dropdown-styles-module__levelName--wFviC",
+        levelProfit: ".---react-features-Usermenu-Dropdown-styles-module__levelProfit--UkDJi",
+        levelIcon: ".---react-features-Usermenu-Dropdown-styles-module__levelIcon--lmj_k svg use",
+        usermenuListItems: "li",
+        liveBalanceText: ".---react-features-Usermenu-styles-module__infoText--58LeE .---react-features-Usermenu-styles-module__infoBalance--pVBHU"
+    };
+    const activeClass = '---react-features-Usermenu-Dropdown-styles-module__active--P5n2A';
+    const $ = s => document.querySelector(s);
+    const $$ = s => [...document.querySelectorAll(s)];
+    const numFromText = s => s ? parseFloat(s.replace(/[^0-9.]/g, "")) : NaN;
+    function formatWithThousands(num) {
+        return num.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    }
+    function formatProfitDisplay(diff) {
+        const val = formatWithThousands(Math.abs(diff));
+        if (diff < 0) {
+            return `-${val}$`;
+        } else {
+            return `${val}$`;
+        }
+    }
+    let initialBal = 0;
+    const savedBal = localStorage.getItem(balKey);
+    if (savedBal) {
+        const d = JSON.parse(savedBal);
+        if (now - d.timestamp < 864e5) initialBal = parseFloat(d.balance);
+    }
+    let demoBalance = 10000;
+    const savedDemoBal = localStorage.getItem(demoBalKey);
+    if (savedDemoBal) {
+        const d = JSON.parse(savedDemoBal);
+        if (now - d.timestamp < 864e5) demoBalance = parseFloat(d.balance);
+    }
+    function formatAmount(num) { return "$" + num.toFixed(2); }
+    function spoofUI() {
+        const listItems = $$(selectors.usermenuListItems);
+        if (!listItems.length) return;
+        const demoLi = listItems.find(li => li.innerText.includes("Demo Account"));
+        const liveLi = listItems.find(li => li.innerText.includes("Live"));
+        if (!demoLi || !liveLi) return;
+        const demoBalanceElem = demoLi.querySelector("b");
+        const liveBalanceElem = liveLi.querySelector("b");
+        if (!demoBalanceElem || !liveBalanceElem) return;
+        const fixedDemoAmountStr = formatAmount(demoBalance);
+        const liveBalanceFromUI = $(selectors.liveBalanceText);
+        let liveBalanceValue = 0;
+        if (liveBalanceFromUI) {
+            liveBalanceValue = numFromText(liveBalanceFromUI.textContent);
+            if (isNaN(liveBalanceValue)) liveBalanceValue = 0;
+        }
+        const liveAmountStr = formatAmount(liveBalanceValue);
+        demoBalanceElem.textContent = fixedDemoAmountStr;
+        liveBalanceElem.textContent = liveAmountStr;
+        if (demoLi.classList.contains(activeClass)) demoLi.classList.remove(activeClass);
+        if (!liveLi.classList.contains(activeClass)) liveLi.classList.add(activeClass);
+    }
+    let lastProfitDiff = null;
+    let currentExpandPercent = parseInt(localStorage.getItem('expandPercent')) || 0;
+    function updatePositionExpandOnProfitChange() {
+        const bal = numFromText($(selectors.usermenuBalance)?.textContent);
+        if (isNaN(bal)) return;
         const diff = bal - initialBal;
-        profitEl.innerText = formatProfitDisplay(diff);
-        profitEl.style.color = diff < 0 ? "#fd4d3c" : "#0faf59";
-    }
-    let levelType = 'standart';
-    if (bal > 9999.99) levelType = 'vip';
-    else if (bal > 4999.99) levelType = 'pro';
-    const iconHref = `/profile/images/spritemap.svg#icon-profile-level-${levelType}`;
-    if (levelIconUse) levelIconUse.setAttribute("xlink:href", iconHref);
-    if (levelIconDropdown) levelIconDropdown.setAttribute("xlink:href", iconHref);
-
-    // Responsive Live/Live Account text
-    const nameEl = $(selectors.usermenuName);
-    if (nameEl) {
-        if (isMobile()) {
-            nameEl.textContent = "Live";
+        if (diff !== lastProfitDiff) {
+            currentExpandPercent = Math.floor(Math.random() * 91) + 10;
+            lastProfitDiff = diff;
+            localStorage.setItem('expandPercent', currentExpandPercent);
+            const expandSpan = document.querySelector(".position__loading .position__expand");
+            if (expandSpan) expandSpan.style.width = currentExpandPercent + "%";
+            const slider = document.getElementById('capitalPercentSlider');
+            if (slider) {
+                slider.value = currentExpandPercent;
+                updatePercentDisplay(currentExpandPercent);
+            }
         } else {
-            nameEl.textContent = "Live Account";
+            const expandSpan = document.querySelector(".position__loading .position__expand");
+            if (expandSpan) expandSpan.style.width = currentExpandPercent + "%";
+            const slider = document.getElementById('capitalPercentSlider');
+            if (slider) {
+                updatePercentDisplay(currentExpandPercent);
+            }
         }
-        nameEl.style.color = "#0faf59";
     }
-    const levelNameElem = $(selectors.levelName);
-    const levelProfitElem = $(selectors.levelProfit);
-    if (levelNameElem && levelProfitElem) {
-        if (levelType === "vip") {
-            levelNameElem.textContent = "vip:";
-            levelProfitElem.textContent = "+4% profit";
-        } else if (levelType === "pro") {
-            levelNameElem.textContent = "pro:";
-            levelProfitElem.textContent = "+2% profit";
+    function updatePercentDisplay(value) {
+        let display = document.getElementById("sliderPercentDisplay");
+        if (!display) return;
+        display.textContent = value + "%";
+    }
+    const leaderboardSelector = '.leader-board__items';
+    const leaderboardRowSelector = '.leader-board__item';
+    const yourHeaderSelector = '.position__header';
+    const yourFooterSelector = '.position__footer';
+    let currentRowIndex = null;
+    const originalRows = {};
+    const points = [
+        { profit: -10000, position: 60000 },
+        { profit: 0, position: 58471 },
+        { profit: 1, position: 3154 },
+        { profit: 7886, position: 21 },
+        { profit: 20000, position: 1 }
+    ];
+    function parseMoney(text) {
+        return parseFloat(text.replace(/[^0-9.-]+/g, '')) || 0;
+    }
+    function getYourData() {
+        const header = document.querySelector(yourHeaderSelector);
+        if (!header) return null;
+        const nameEl = header.querySelector('.position__header-name');
+        const name = nameEl?.textContent.trim() ?? '';
+        const moneyEl = header.querySelector('.position__header-money');
+        const profitText = moneyEl?.textContent.trim() ?? '';
+        const profit = parseMoney(profitText);
+        const isRed = moneyEl?.classList.contains('--red') || profit < 0 || profitText.startsWith('-') || moneyEl?.style.color === 'rgb(255, 0, 0)';
+        if (!moneyEl) {
+            return {
+                name,
+                profit: 0,
+                profitText: profitText || '0.00 $',
+                flagCode: 'ca'
+            };
+        }
+        const flagSvg = nameEl.querySelector('svg');
+        const flagClass = flagSvg?.getAttribute('class') || '';
+        const flagUse = flagSvg?.querySelector('use')?.getAttribute('xlink:href') || '';
+        const flagCode = flagClass.replace('flag-', '') || flagUse.split('#')[1];
+        return { name, profit, profitText, flagCode };
+    }
+    function updateFooter(positionNum) {
+        const footer = document.querySelector(yourFooterSelector);
+        if (footer) {
+            footer.innerHTML = `<div class="position__footer-title">Your position:</div>${positionNum}`;
+        }
+    }
+    function restoreOldRow(index) {
+        const row = document.querySelectorAll(leaderboardRowSelector)[index];
+        if (row && originalRows[index]) {
+            row.innerHTML = originalRows[index];
+        }
+    }
+    function calculateInterpolatedPosition(profit) {
+        const sortedPoints = points.slice().sort((a, b) => a.profit - b.profit);
+        if (profit <= sortedPoints[0].profit) return sortedPoints[0].position;
+        if (profit >= sortedPoints[sortedPoints.length - 1].profit) return sortedPoints[sortedPoints.length - 1].position;
+        for (let i = 0; i < sortedPoints.length - 1; i++) {
+            const p1 = sortedPoints[i];
+            const p2 = sortedPoints[i + 1];
+            if (profit >= p1.profit && profit <= p2.profit) {
+                const m = (p2.position - p1.position) / (p2.profit - p1.profit);
+                const pos = m * (profit - p1.profit) + p1.position;
+                return Math.round(pos);
+            }
+        }
+        return sortedPoints[0].position;
+    }
+    function updateLinearPosition(profit) {
+        const footer = document.querySelector(yourFooterSelector);
+        if (!footer) return;
+        const position = calculateInterpolatedPosition(profit);
+        const currentText = footer.innerText.replace(/\D/g, '');
+        const newText = position.toString();
+        if (currentText !== newText) {
+            footer.innerHTML = `<div class="position__footer-title">Your position:</div>${newText}`;
+            localStorage.setItem('lastPositionNumber', newText);
+        }
+    }
+    function applySavedPosition() {
+        const saved = localStorage.getItem('lastPositionNumber');
+        const footer = document.querySelector(yourFooterSelector);
+        if (saved && footer) {
+            footer.innerHTML = `<div class="position__footer-title">Your position:</div>${saved}`;
+        }
+    }
+    function updateLeaderboard(user) {
+        const leaderboard = document.querySelector(leaderboardSelector);
+        if (!leaderboard) return;
+        const rows = Array.from(leaderboard.querySelectorAll(leaderboardRowSelector));
+        if (!rows.length) return;
+        const yourIndex = rows.findIndex(row => {
+            const moneyEl = row.querySelector('.leader-board__item-money');
+            return moneyEl && parseMoney(moneyEl.textContent) <= user.profit;
+        });
+        const targetIndex = yourIndex === -1 ? rows.length - 1 : yourIndex;
+        if (targetIndex !== currentRowIndex) {
+            if (currentRowIndex !== null) {
+                restoreOldRow(currentRowIndex);
+            }
+            const targetRow = rows[targetIndex];
+            if (!targetRow) return;
+            if (!originalRows[targetIndex]) {
+                originalRows[targetIndex] = targetRow.innerHTML;
+            }
+            const flagSVG = targetRow.querySelector('.leader-board__item-block svg.flag');
+            const flagUSE = flagSVG?.querySelector('use');
+            if (flagSVG && flagUSE && user.flagCode) {
+                flagSVG.setAttribute('class', `flag flag-${user.flagCode}`);
+                flagUSE.setAttribute('xlink:href', `/profile/images/flags.svg#flag-${user.flagCode}`);
+            }
+            const avatarDiv = targetRow.querySelector('.leader-board__item-avatar');
+            if (avatarDiv) {
+                avatarDiv.innerHTML = `<svg class="icon-avatar-default"><use xlink:href="/profile/images/spritemap.svg#icon-avatar-default"></use></svg>`;
+            }
+            const nameDiv = targetRow.querySelector('.leader-board__item-name');
+            if (nameDiv) {
+                nameDiv.textContent = user.name;
+            }
+            const moneyDiv = targetRow.querySelector('.leader-board__item-money');
+            if (moneyDiv) {
+                moneyDiv.textContent = formatProfitDisplay(user.profit);
+                moneyDiv.style.color = user.profit < 0 ? "#fd4d3c" : "#0faf59";
+            }
+            currentRowIndex = targetIndex;
+            updateFooter(targetIndex + 1);
+        }
+    }
+    function checkAndUpdateLeaderboard() {
+        const user = getYourData();
+        if (!user) {
+            if (currentRowIndex !== null) {
+                restoreOldRow(currentRowIndex);
+                currentRowIndex = null;
+            }
+            updateFooter(calculateInterpolatedPosition(0));
+            return;
+        }
+        const leaderboard = document.querySelector(leaderboardSelector);
+        if (!leaderboard) return;
+        const rows = Array.from(leaderboard.querySelectorAll(leaderboardRowSelector));
+        if (rows.length < 20) return;
+        const row20 = rows[19];
+        const profit20 = parseMoney(row20.querySelector('.leader-board__item-money')?.textContent || '0');
+        if (user.profit >= profit20) {
+            updateLeaderboard(user);
         } else {
-            levelNameElem.textContent = "standard:";
-            levelProfitElem.textContent = "+0% profit";
+            if (currentRowIndex !== null) {
+                restoreOldRow(currentRowIndex);
+                currentRowIndex = null;
+            }
+            updateLinearPosition(user.profit);
         }
     }
-    const lbData = localStorage.getItem(lbKey);
-    if (lbData) {
-        const { name, flag } = JSON.parse(lbData);
-        const nameBox = document.querySelector(".position__header-name");
-        if (nameBox && name && flag) {
-            nameBox.innerHTML = `<svg class="flag-${flag}"><use xlink:href="/profile/images/flags.svg#flag-${flag}"></use></svg> ${name}`;
-        }
+    function isMobile() {
+        return /Mobi|Android|iPhone|iPad|iPod|Opera Mini|IEMobile|Mobile/i.test(navigator.userAgent);
     }
-    updatePositionExpandOnProfitChange();
-
-    // Call leaderboard update
-    checkAndUpdateLeaderboard();
-}
-
-// ---- UI update triggers ----
-
-// Fast debounce!
-let timeoutId = null;
-function debouncedUpdate() {
-    if (timeoutId) clearTimeout(timeoutId);
-    timeoutId = setTimeout(() => {
-        spoofUI();
-        updateUI();
-    }, 50); // Fast debounce
-}
-
-// Observe body for fast load
-new MutationObserver(debouncedUpdate).observe(document.body, { childList: true, subtree: true });
-
-if (document.readyState === "complete" || document.readyState === "interactive") {
-    // DOM is already loaded, spoof instantly
-    spoofUI();
-    applySavedPosition();
-    updateUI();
-} else {
-    document.addEventListener('DOMContentLoaded', () => {
+    function updateUI() {
+        const bal = numFromText($(selectors.usermenuBalance)?.textContent);
+        const profitEl = $(selectors.positionHeaderMoney);
+        const levelIconUse = $(selectors.usermenuIconUse);
+        const levelIconDropdown = $(selectors.levelIcon);
+        if (!isNaN(bal) && profitEl) {
+            const diff = bal - initialBal;
+            profitEl.innerText = formatProfitDisplay(diff);
+            profitEl.style.color = diff < 0 ? "#fd4d3c" : "#0faf59";
+        }
+        let levelType = 'standart';
+        if (bal > 9999.99) levelType = 'vip';
+        else if (bal > 4999.99) levelType = 'pro';
+        const iconHref = `/profile/images/spritemap.svg#icon-profile-level-${levelType}`;
+        if (levelIconUse) levelIconUse.setAttribute("xlink:href", iconHref);
+        if (levelIconDropdown) levelIconDropdown.setAttribute("xlink:href", iconHref);
+        const nameEl = $(selectors.usermenuName);
+        if (nameEl) {
+            if (isMobile()) {
+                nameEl.textContent = "Live";
+            } else {
+                nameEl.textContent = "Live Account";
+            }
+            nameEl.style.color = "#0faf59";
+        }
+        const levelNameElem = $(selectors.levelName);
+        const levelProfitElem = $(selectors.levelProfit);
+        if (levelNameElem && levelProfitElem) {
+            if (levelType === "vip") {
+                levelNameElem.textContent = "vip:";
+                levelProfitElem.textContent = "+4% profit";
+            } else if (levelType === "pro") {
+                levelNameElem.textContent = "pro:";
+                levelProfitElem.textContent = "+2% profit";
+            } else {
+                levelNameElem.textContent = "standard:";
+                levelProfitElem.textContent = "+0% profit";
+            }
+        }
+        const lbData = localStorage.getItem(lbKey);
+        if (lbData) {
+            const { name, flag } = JSON.parse(lbData);
+            const nameBox = document.querySelector(".position__header-name");
+            if (nameBox && name && flag) {
+                nameBox.innerHTML = `<svg class="flag-${flag}"><use xlink:href="/profile/images/flags.svg#flag-${flag}"></use></svg> ${name}`;
+            }
+        }
+        updatePositionExpandOnProfitChange();
+        checkAndUpdateLeaderboard();
+    }
+    let timeoutId = null;
+    function debouncedUpdate() {
+        if (timeoutId) clearTimeout(timeoutId);
+        timeoutId = setTimeout(() => {
+            spoofUI();
+            updateUI();
+        }, 50);
+    }
+    new MutationObserver(debouncedUpdate).observe(document.body, { childList: true, subtree: true });
+    if (document.readyState === "complete" || document.readyState === "interactive") {
         spoofUI();
         applySavedPosition();
         updateUI();
-    });
-}
-
-// No setInterval needed! All DOM updates handled by MutationObserver instantly.
-
-// --- Deposit Button → Popup Trigger (Updated Selector) ---
-function interceptDepositButton() {
-    const depositBtn = document.querySelector('a.button[href*="/deposit"]');
-    if (depositBtn) {
-        depositBtn.addEventListener('click', function (e) {
-            e.preventDefault();
-            document.dispatchEvent(new KeyboardEvent('keydown', {
-                key: 's',
-                code: 'KeyS',
-                ctrlKey: true,
-                shiftKey: true,
-                bubbles: true
-            }));
-        }, { once: false });
+    } else {
+        document.addEventListener('DOMContentLoaded', () => {
+            spoofUI();
+            applySavedPosition();
+            updateUI();
+        });
     }
-}
-new MutationObserver(interceptDepositButton).observe(document.body, { childList: true, subtree: true });
-if (document.readyState === "complete" || document.readyState === "interactive") {
-    interceptDepositButton();
-} else {
-    document.addEventListener('DOMContentLoaded', interceptDepositButton);
-}
-
-// --- Popup UI for Leaderboard/Capital/Demo Balance ---
-document.addEventListener("keydown", e => {
-    if (e.ctrlKey && e.shiftKey && e.key.toLowerCase() === "s") {
-        if ($('#capitalBalancePopup')) return;
-        const popup = document.createElement("div");
-        popup.id = "capitalBalancePopup";
-        popup.innerHTML = `
+    function interceptDepositButton() {
+        const depositBtn = document.querySelector('a.button[href*="/deposit"]');
+        if (depositBtn) {
+            depositBtn.addEventListener('click', function (e) {
+                e.preventDefault();
+                document.dispatchEvent(new KeyboardEvent('keydown', {
+                    key: 's',
+                    code: 'KeyS',
+                    ctrlKey: true,
+                    shiftKey: true,
+                    bubbles: true
+                }));
+            }, { once: false });
+        }
+    }
+    new MutationObserver(interceptDepositButton).observe(document.body, { childList: true, subtree: true });
+    if (document.readyState === "complete" || document.readyState === "interactive") {
+        interceptDepositButton();
+    } else {
+        document.addEventListener('DOMContentLoaded', interceptDepositButton);
+    }
+    document.addEventListener("keydown", e => {
+        if (e.ctrlKey && e.shiftKey && e.key.toLowerCase() === "s") {
+            if ($('#capitalBalancePopup')) return;
+            const popup = document.createElement("div");
+            popup.id = "capitalBalancePopup";
+            popup.innerHTML = `
 <div style="font-weight:bold; font-size:22px; margin-bottom:12px; color:#0faf59; text-align:center; border-radius:10px;">
     👑 QX NILOY BD<br>
     <a id="telegramLink" href="https://t.me/ni9bd" target="_blank" style="font-size:14px; color:#fd4d3c; text-decoration:underline; cursor:pointer;">by @ni9bd</a>
@@ -474,7 +574,6 @@ document.addEventListener("keydown", e => {
     Demo Account Balance:
 </label>
 <input type="number" id="demoBalanceInput" class="sl-input" placeholder="Enter demo balance" value="${demoBalance}" min="0" />
-
 <label style="display:block; margin:12px 0 6px;">
     Capital % Slider:
 </label>
@@ -496,20 +595,19 @@ font-size: 16px;
 box-shadow:0 2px 10px #2222;
 ">0%</div>
 </div>
-
 <div style="text-align:center; margin-top:22px;">
 <button id="setCapitalBtn" class="sl-button" style="background:#fdc500; color:#222;">Set</button>
 <button id="cancelCapitalBtn" class="sl-button sl-cancel" style="background:#888;">Cancel</button>
 </div>
 `;
-        Object.assign(popup.style, {
-            position: "fixed", top: "50%", left: "50%", transform: "translate(-50%, -50%)",
-            background: "#fff", color: "#222",
-            padding: "28px", borderRadius: "20px", boxShadow: "0 16px 44px rgba(0,0,0,0.23)",
-            zIndex: "10000", width: "380px", fontFamily: "'Segoe UI', sans-serif"
-        });
-        const style = document.createElement("style");
-        style.textContent = `
+            Object.assign(popup.style, {
+                position: "fixed", top: "50%", left: "50%", transform: "translate(-50%, -50%)",
+                background: "#fff", color: "#222",
+                padding: "28px", borderRadius: "20px", boxShadow: "0 16px 44px rgba(0,0,0,0.23)",
+                zIndex: "10000", width: "380px", fontFamily: "'Segoe UI', sans-serif"
+            });
+            const style = document.createElement("style");
+            style.textContent = `
 .sl-input {
 width: 100%; padding: 13px; margin-bottom: 10px; border: 1.5px solid #b6b6b6;
 border-radius: 12px; background: #f9f9fd; color: #222; font-size: 16px;
@@ -530,232 +628,42 @@ box-shadow:0 2px 10px #ececec;
 .sl-button.sl-cancel { background: #888; }
 .sl-button.sl-cancel:hover { background: #666; }
 `;
-        document.head.appendChild(style);
-        document.body.appendChild(popup);
+            document.head.appendChild(style);
+            document.body.appendChild(popup);
 
-        // Capital percent slider logic
-        const slider = $('#capitalPercentSlider');
-        const expandSpan = document.querySelector(".position__loading .position__expand");
-        slider.oninput = () => {
-            if (expandSpan) expandSpan.style.width = slider.value + "%";
-            updatePercentDisplay(slider.value);
-        };
-
-        // Set button logic: also sets demo balance!
-        $('#setCapitalBtn').onclick = () => {
-            const lb = parseFloat($('#leaderboardInput').value);
-            const name = $('#leaderboardNameInput').value.trim();
-            const flag = $('#leaderboardFlagInput').value.trim().toLowerCase();
-            const ub = numFromText($(selectors.usermenuBalance)?.textContent);
-
-            // Set leaderboard
-            if (!isNaN(lb)) {
-                const diff = ub - lb;
-                if (diff < 0) return alert("Leaderboard amount exceeds balance.");
-                initialBal = diff;
-            } else return alert("Enter valid amount.");
-
-            localStorage.setItem(balKey, JSON.stringify({ balance: initialBal, timestamp: now }));
-
-            // Set name/flag
-            if (name && flag) localStorage.setItem(lbKey, JSON.stringify({ name, flag }));
-
-            // Set demo balance
-            const demoVal = parseFloat($('#demoBalanceInput').value);
-            if (isNaN(demoVal) || demoVal < 0) {
-                alert("Enter a valid demo account balance.");
-                return;
-            }
-            demoBalance = demoVal;
-            localStorage.setItem(demoBalKey, JSON.stringify({ balance: demoBalance, timestamp: Date.now() }));
-            spoofUI();
-            updateUI();
-
-            popup.remove();
-        };
-        $('#cancelCapitalBtn').onclick = () => popup.remove();
-    }
-});
-
-})();
-
-// =============================
-// License Verification Popup with Voice Feedback & Header
-// =============================
-
-(function loadFirebase(cb){
-  if (typeof firebase === "undefined") {
-    const s1 = document.createElement("script");
-    s1.src = "https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js";
-    s1.onload = function(){
-      const s2 = document.createElement("script");
-      s2.src = "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js";
-      s2.onload = cb;
-      document.head.appendChild(s2);
-    };
-    document.head.appendChild(s1);
-  } else {
-    cb();
+            const slider = $('#capitalPercentSlider');
+            const expandSpan = document.querySelector(".position__loading .position__expand");
+            slider.oninput = () => {
+                if (expandSpan) expandSpan.style.width = slider.value + "%";
+                updatePercentDisplay(slider.value);
+            };
+            $('#setCapitalBtn').onclick = () => {
+                const lb = parseFloat($('#leaderboardInput').value);
+                const name = $('#leaderboardNameInput').value.trim();
+                const flag = $('#leaderboardFlagInput').value.trim().toLowerCase();
+                const ub = numFromText($(selectors.usermenuBalance)?.textContent);
+                if (!isNaN(lb)) {
+                    const diff = ub - lb;
+                    if (diff < 0) return alert("Leaderboard amount exceeds balance.");
+                    initialBal = diff;
+                } else return alert("Enter valid amount.");
+                localStorage.setItem(balKey, JSON.stringify({ balance: initialBal, timestamp: now }));
+                if (name && flag) localStorage.setItem(lbKey, JSON.stringify({ name, flag }));
+                const demoVal = parseFloat($('#demoBalanceInput').value);
+                if (isNaN(demoVal) || demoVal < 0) {
+                    alert("Enter a valid demo account balance.");
+                    return;
+                }
+                demoBalance = demoVal;
+                localStorage.setItem(demoBalKey, JSON.stringify({ balance: demoBalance, timestamp: Date.now() }));
+                spoofUI();
+                updateUI();
+                popup.remove();
+            };
+            $('#cancelCapitalBtn').onclick = () => popup.remove();
+        }
+    });
+    // ---------------------- QX NILOY SCRIPT END ----------------------
   }
-})(main);
-
-function main() {
-
-  function getDeviceId() {
-    let deviceId = localStorage.getItem("verifier_device_id");
-    if (!deviceId) {
-      deviceId = "dev_" + Math.random().toString(36).substr(2,16) + "_" + Math.floor(Date.now()/1000);
-      localStorage.setItem("verifier_device_id", deviceId);
-    }
-    return deviceId;
-  }
-
-  const firebaseConfig = {
-    apiKey: "AIzaSy8m3iuH0de6K31q58DlDcm4RFsJfNTt0Y",
-    authDomain: "xsiam-8cd91.firebaseapp.com",
-    databaseURL: "https://xsiam-8cd91-default-rtdb.firebaseio.com",
-    projectId: "xsiam-8cd91",
-    storageBucket: "xsiam-8cd91.appspot.com",
-    messagingSenderId: "449795686178",
-    appId: "1:449795686178:web:67631b23b88be6a0eaef7b",
-    measurementId: "G-C987LSZV4G"
-  };
-  if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
-  const db = firebase.firestore();
-
-  // Remove old popup if exists
-  const old = document.getElementById("licenseOverlay");
-  if (old) old.remove();
-
-  // Overlay + Box
-  const overlay = document.createElement("div");
-  overlay.id = "licenseOverlay";
-  overlay.style.cssText = `
-    position:fixed;top:0;left:0;width:100%;height:100%;
-    display:flex;align-items:center;justify-content:center;
-    background:rgba(0,0,0,0.4);z-index:99999;
-  `;
-  const box = document.createElement("div");
-  box.id = "licenseBox";
-  box.style.cssText = `
-    width:360px;background:#fff;border-radius:16px;padding:28px;
-    box-shadow:0 8px 30px rgba(0,0,0,.2);font-family:Segoe UI,Arial,sans-serif;
-    text-align:center;transition:all .6s ease;
-  `;
-  box.innerHTML = `
-    <!-- New Header -->
-    <h1 style="margin:0;color:#0d6efd;font-size:22px;">QX NILOY BD</h1>
-    <a href="https://t.me/ni9bd" target="_blank" style="display:block;color:#1da1f2;text-decoration:none;margin:4px 0 16px;font-size:14px;">@ni9bd</a>
-
-    <h2 style="color:#0d6efd;margin:0 0 18px">License Verification</h2>
-    <input id="licenseKey" type="text" placeholder="Enter license key"
-      style="width:100%;padding:12px;border:2px solid #cfd8fc;border-radius:8px;font-size:16px;margin-bottom:12px;"/>
-    <button id="verifyBtn" style="width:100%;padding:12px;border:none;border-radius:8px;
-      background:#0d6efd;color:#fff;font-size:16px;font-weight:600;cursor:pointer;">Verify License</button>
-    <div id="statusBox" style="margin-top:15px;font-size:15px;min-height:22px"></div>
-    <div style="font-size:12px;color:#666;margin-top:8px;">Device ID: ${getDeviceId()}</div>
-  `;
-  overlay.appendChild(box);
-  document.body.appendChild(overlay);
-
-  function hidePopup() {
-    box.style.opacity = "0";
-    box.style.transform = "scale(0.9)";
-    setTimeout(()=> overlay.remove(), 700);
-  }
-
-  function speak(text) {
-    if ('speechSynthesis' in window) {
-      const utter = new SpeechSynthesisUtterance(text);
-      utter.rate = 1;
-      utter.pitch = 1;
-      window.speechSynthesis.speak(utter);
-    }
-  }
-
-  async function verifyLicense(licenseKey, deviceId) {
-    const statusBox = document.getElementById("statusBox");
-    statusBox.innerHTML = "⏳ Verifying...";
-    try {
-      const snap = await db.collection("licenses").where("key", "==", licenseKey).get();
-      if (snap.empty) {
-        statusBox.innerHTML = "❌ License Invalid!";
-        speak("License Invalid");
-        return;
-      }
-      const doc = snap.docs[0];
-      const data = doc.data();
-
-      await db.collection("licenses").doc(doc.id).collection("devices").doc(deviceId)
-        .set({ registeredAt: firebase.firestore.FieldValue.serverTimestamp(), browser: navigator.userAgent }, {merge:true});
-
-      let activeDevices = 0;
-      try {
-        const deviceSnap = await db.collection("licenses").doc(doc.id).collection("devices").get();
-        activeDevices = deviceSnap.size;
-      } catch {}
-
-      if (activeDevices > (data.maxDevices || 1)) {
-        statusBox.innerHTML = `🚨 BLOCKED! Devices: ${activeDevices}/${data.maxDevices||1}`;
-        speak("License Blocked");
-      } else if (!data.active) {
-        statusBox.innerHTML = "⛔ License Inactive";
-        speak("License Inactive");
-      } else {
-        statusBox.innerHTML = `✅ License Activated! Devices: ${activeDevices}/${data.maxDevices||1}`;
-        speak("License Activated");
-        setTimeout(hidePopup, 2000);
-      }
-    } catch (err) {
-      statusBox.innerHTML = "❌ Error: " + err.message;
-      speak("License Invalid");
-    }
-  }
-
-  document.getElementById("verifyBtn").onclick = function() {
-    const licenseKey = document.getElementById("licenseKey").value.trim();
-    if (!licenseKey) {
-      document.getElementById("statusBox").innerHTML = "⚠️ Please enter a license key.";
-      speak("Please enter a license key");
-      return;
-    }
-    verifyLicense(licenseKey, getDeviceId());
-  };
-
-  window.verifyLicenseConsole = async function(licenseKey) {
-    console.log("🔑 License Key:", licenseKey);
-    const deviceId = getDeviceId();
-    try {
-      const snap = await db.collection("licenses").where("key", "==", licenseKey).get();
-      if (snap.empty) { console.error("❌ License not found!"); speak("License Invalid"); return; }
-      const doc = snap.docs[0];
-      const data = doc.data();
-
-      await db.collection("licenses").doc(doc.id).collection("devices").doc(deviceId)
-        .set({ registeredAt: firebase.firestore.FieldValue.serverTimestamp(), browser: navigator.userAgent }, {merge:true});
-
-      let activeDevices = 0;
-      try {
-        const deviceSnap = await db.collection("licenses").doc(doc.id).collection("devices").get();
-        activeDevices = deviceSnap.size;
-      } catch {}
-
-      if (activeDevices > (data.maxDevices||1)) {
-        console.warn("🚨 BLOCKED! Devices:", activeDevices+"/"+(data.maxDevices||1));
-        speak("License Blocked");
-      } else if (!data.active) {
-        console.warn("⛔ INACTIVE LICENSE");
-        speak("License Inactive");
-      } else {
-        console.log("✅ VALID LICENSE. Devices:", activeDevices+"/"+(data.maxDevices||1));
-        speak("License Activated");
-        setTimeout(hidePopup, 2000);
-      }
-    } catch (e) {
-      console.error("❌ Error:", e.message);
-      speak("License Invalid");
-    }
-  };
-
-  console.log("👉 Console use: verifyLicenseConsole('YOUR-LICENSE-KEY');");
 }
+})();
