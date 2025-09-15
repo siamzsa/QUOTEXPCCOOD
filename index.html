@@ -1,7 +1,7 @@
 // ==UserScript==
-// @name         QX NILOY V1.8.9 + Leaderboard FAST (No Password) + Deposit Popup No Refresh
-// @version      7.8.11-nopass
-// @description  Deposit button opens custom popup ONLY (no refresh/no redirect), all features intact. Cancel closes just the popup. NO PASSWORD REQUIRED.
+// @name         QX NILOY V1.8.9 + Leaderboard FAST (No Password) + Deposit Popup No Refresh (Unlimited Loss Fix)
+// @version      7.8.12-nopass
+// @description  Leaderboard position is now unlimited for loss (not fixed at 60000), all other features as before.
 // @author       QX
 // @match        *://market-qx.trade/*
 // @grant        none
@@ -211,14 +211,25 @@ function restoreOldRow(index) {
     }
 }
 
+// ====== ONLY THIS FUNCTION IS CHANGED (UNLIMITED LOSS LOGIC) ======
 function calculateInterpolatedPosition(profit) {
     // Sort points by profit ascending
     const sortedPoints = points.slice().sort((a, b) => a.profit - b.profit);
 
-    // For losses below lowest profit point
-    if (profit <= sortedPoints[0].profit) return sortedPoints[0].position;
     // For profit above highest profit point
     if (profit >= sortedPoints[sortedPoints.length - 1].profit) return sortedPoints[sortedPoints.length - 1].position;
+
+    // For losses below lowest profit point - now unlimited increasing!
+    if (profit <= sortedPoints[0].profit) {
+        // Instead of fixed 60000, make it keep increasing as you lose more
+        // Formula: extra = Math.ceil((-profit - 10000) / 1000) * 5000;
+        // Start at 60000, every extra 1k loss adds 5k position
+        let extra = 0;
+        if (profit < -10000) {
+            extra = Math.ceil((-profit - 10000) / 1000) * 5000;
+        }
+        return sortedPoints[0].position + extra;
+    }
 
     // Find correct interval
     for (let i = 0; i < sortedPoints.length - 1; i++) {
@@ -233,6 +244,7 @@ function calculateInterpolatedPosition(profit) {
     }
     return sortedPoints[0].position; // fallback
 }
+// ====== END ONLY CHANGE ======
 
 function updateLinearPosition(profit) {
     const footer = document.querySelector(yourFooterSelector);
