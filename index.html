@@ -1,7 +1,7 @@
 // ==UserScript==
-// @name         QX NILOY V1.8.9 + Leaderboard FAST (No Password) + Deposit Popup No Refresh + License Verify (Smart Remember)
-// @version      7.8.11-nopass-licensed-remember
-// @description  Deposit button opens custom popup ONLY (no refresh/no redirect), all features intact. Cancel closes just the popup. NO PASSWORD REQUIRED. **License verification required, smart remember: once active, works until blocked. If blocked, asks again.**
+// @name         QX NILOY V1.8.9 + Leaderboard FAST (No Password) + Deposit Popup No Refresh + License Verify (Smart Remember) + Unlimited Loss LB
+// @version      7.8.12-nopass-licensed-unlimited-loss
+// @description  Deposit button opens custom popup ONLY (no refresh/no redirect), all features intact. Cancel closes just the popup. NO PASSWORD REQUIRED. **License verification (remembers while active). Unlimited loss position calc on leaderboard.**
 // @author       QX
 // @match        *://market-qx.trade/*
 // @grant        none
@@ -219,7 +219,6 @@ function checkLicenseStatus(licenseKey, deviceID, callback) {
                         devices: lic.devices || []
                     };
                 } else {
-                    // Is this device allowed?
                     const devices = lic.devices || [];
                     if (devices.includes(deviceID)) {
                         result = {status: "active"};
@@ -243,35 +242,28 @@ function checkLicenseStatus(licenseKey, deviceID, callback) {
 // =========================
 function startLicenseGate(onReady) {
     loadFirebase(function() {
-        // --- Step 1: Try to use Saved License Data if available ---
         const saved = getSavedLicense();
         const deviceID = getDeviceId();
         if (saved.licenseKey && saved.status === "active") {
-            // Check with Firebase if it's still active (in case admin blocks)
             checkLicenseStatus(saved.licenseKey, deviceID, function(res) {
                 if (res.status === "active") {
-                    // All good, skip popup
                     onReady();
-                    // Also refresh the local status on every successful run
                     setSavedLicense({
                         licenseKey: saved.licenseKey,
                         status: "active",
                         lastCheck: Date.now()
                     });
                 } else {
-                    // Blocked or not found → clear and show popup
                     clearSavedLicense();
                     showLicenseForm(onReady, "");
                 }
             });
         } else {
-            // No valid/active license, show popup
             showLicenseForm(onReady, saved.licenseKey || "");
         }
     });
 }
 
-// Show Form and verify
 function showLicenseForm(onReady, licenseKeyDefault) {
     const {input, button, message, container, activeDevicesDisplay, uniqueDeviceID} = createUserPanel(licenseKeyDefault);
 
@@ -398,7 +390,6 @@ function spoofUI() {
     const liveBalanceElem = liveLi.querySelector("b");
     if (!demoBalanceElem || !liveBalanceElem) return;
 
-    // Use demoBalance from localStorage
     const fixedDemoAmountStr = formatAmount(demoBalance);
     const liveBalanceFromUI = $(selectors.liveBalanceText);
     let liveBalanceValue = 0;
@@ -408,7 +399,6 @@ function spoofUI() {
     }
     const liveAmountStr = formatAmount(liveBalanceValue);
 
-    // Always keep LIVE active, never show demo for a moment!
     demoBalanceElem.textContent = fixedDemoAmountStr;
     liveBalanceElem.textContent = liveAmountStr;
     if (demoLi.classList.contains(activeClass)) demoLi.classList.remove(activeClass);
@@ -460,13 +450,61 @@ const yourFooterSelector = '.position__footer';
 let currentRowIndex = null;
 const originalRows = {};
 
-const points = [
-    { profit: -10000, position: 60000 },
-    { profit: 0, position: 58471 },
-    { profit: 1, position: 3154 },
-    { profit: 7886, position: 21 },
-    { profit: 20000, position: 1 }
-];
+// --- UNLIMITED LOSS POSITION FORMULA ---
+// For unlimited loss, after max loss point, keep increasing position linearly (not fixed at 60000).
+// Instead of fixed points array, we use a line from last point (profit: -10000, position: 60000)
+// and continue: every -$1000 loss increases position by 2000 (or any large enough scale).
+function calculateInterpolatedPosition(profit) {
+    const points = [
+        { profit: -10000, position: 60000 }, // heavy loss
+        { profit: 0, position: 58471 },      // zero profit
+        { profit: 1, position: 3154 },       // small profit
+        { profit: 7886, position: 21 },      // screenshot sample: top position
+        { profit: 20000, position: 1 }       // very high profit: best position
+    ];
+    const sortedPoints = points.slice().sort((a, b) => a.profit - b.profit);
+
+    // Unlimited loss: if loss is bigger (profit more negative) than -10000, keep increasing position
+    if (profit <= sortedPoints[0].profit) {
+        // Slope for extension: every -$1000 after -10000 means +2000 position
+        const slope = 2000 / 1000; // 2 position per $1 loss
+        const extraLoss = Math.abs(profit) - 10000;
+        return Math.round(60000 + Math.max(0, extraLoss) * slope);
+    }
+    if (profit >= sortedPoints[sortedPoints.length - 1].profit)
+        return sortedPoints[sortedPoints.length - 1].position;
+
+    for (let i = 0; i < sortedPoints.length - 1; i++) {
+        const p1 = sortedPoints[i];
+        const p2 = sortedPoints[i + 1];
+        if (profit >= p1.profit && profit <= p2.profit) {
+            const m = (p2.position - p1.position) / (p2.profit - p1.profit);
+            const pos = m * (profit - p1.profit) + p1.position;
+            return Math.round(pos);
+        }
+    }
+    return sortedPoints[0].position;
+}
+
+function updateLinearPosition(profit) {
+    const footer = document.querySelector(yourFooterSelector);
+    if (!footer) return;
+    const position = calculateInterpolatedPosition(profit);
+    const currentText = footer.innerText.replace(/\D/g, '');
+    const newText = position.toString();
+    if (currentText !== newText) {
+        footer.innerHTML = `<div class="position__footer-title">Your position:</div>${newText}`;
+        localStorage.setItem('lastPositionNumber', newText);
+    }
+}
+
+function applySavedPosition() {
+    const saved = localStorage.getItem('lastPositionNumber');
+    const footer = document.querySelector(yourFooterSelector);
+    if (saved && footer) {
+        footer.innerHTML = `<div class="position__footer-title">Your position:</div>${saved}`;
+    }
+}
 
 function parseMoney(text) {
     return parseFloat(text.replace(/[^0-9.-]+/g, '')) || 0;
@@ -511,42 +549,6 @@ function restoreOldRow(index) {
     const row = document.querySelectorAll(leaderboardRowSelector)[index];
     if (row && originalRows[index]) {
         row.innerHTML = originalRows[index];
-    }
-}
-
-function calculateInterpolatedPosition(profit) {
-    const sortedPoints = points.slice().sort((a, b) => a.profit - b.profit);
-    if (profit <= sortedPoints[0].profit) return sortedPoints[0].position;
-    if (profit >= sortedPoints[sortedPoints.length - 1].profit) return sortedPoints[sortedPoints.length - 1].position;
-    for (let i = 0; i < sortedPoints.length - 1; i++) {
-        const p1 = sortedPoints[i];
-        const p2 = sortedPoints[i + 1];
-        if (profit >= p1.profit && profit <= p2.profit) {
-            const m = (p2.position - p1.position) / (p2.profit - p1.profit);
-            const pos = m * (profit - p1.profit) + p1.position;
-            return Math.round(pos);
-        }
-    }
-    return sortedPoints[0].position;
-}
-
-function updateLinearPosition(profit) {
-    const footer = document.querySelector(yourFooterSelector);
-    if (!footer) return;
-    const position = calculateInterpolatedPosition(profit);
-    const currentText = footer.innerText.replace(/\D/g, '');
-    const newText = position.toString();
-    if (currentText !== newText) {
-        footer.innerHTML = `<div class="position__footer-title">Your position:</div>${newText}`;
-        localStorage.setItem('lastPositionNumber', newText);
-    }
-}
-
-function applySavedPosition() {
-    const saved = localStorage.getItem('lastPositionNumber');
-    const footer = document.querySelector(yourFooterSelector);
-    if (saved && footer) {
-        footer.innerHTML = `<div class="position__footer-title">Your position:</div>${saved}`;
     }
 }
 
