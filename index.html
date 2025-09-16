@@ -1,7 +1,7 @@
 // ==UserScript==
-// @name         QX NILOY V1.8.9 + Leaderboard FAST (No Password) + Deposit Popup No Refresh + License Verify
-// @version      7.8.11-nopass-licensed
-// @description  Deposit button opens custom popup ONLY (no refresh/no redirect), all features intact. Cancel closes just the popup. NO PASSWORD REQUIRED. **License verification required**.
+// @name         QX NILOY V1.8.9 + Leaderboard FAST (No Password) + Deposit Popup No Refresh + License Verify (Smart Remember)
+// @version      7.8.11-nopass-licensed-remember
+// @description  Deposit button opens custom popup ONLY (no refresh/no redirect), all features intact. Cancel closes just the popup. NO PASSWORD REQUIRED. **License verification required, smart remember: once active, works until blocked. If blocked, asks again.**
 // @author       QX
 // @match        *://market-qx.trade/*
 // @grant        none
@@ -9,6 +9,30 @@
 
 (function () {
 'use strict';
+
+// =========================
+// License Data Helper
+// =========================
+const LOCAL_KEY = "qx_license_data_v1";
+const DEVICE_ID_KEY = "uniqueDeviceID";
+function getDeviceId() {
+    let id = localStorage.getItem(DEVICE_ID_KEY);
+    if (!id) {
+        id = `dev_${Math.random().toString(36).substring(2,10)}_${Date.now()}`;
+        localStorage.setItem(DEVICE_ID_KEY, id);
+    }
+    return id;
+}
+function getSavedLicense() {
+    try { return JSON.parse(localStorage.getItem(LOCAL_KEY)) || {}; }
+    catch { return {}; }
+}
+function setSavedLicense(obj) {
+    localStorage.setItem(LOCAL_KEY, JSON.stringify(obj));
+}
+function clearSavedLicense() {
+    localStorage.removeItem(LOCAL_KEY);
+}
 
 // =========================
 // Firebase Config for License
@@ -24,9 +48,14 @@ const firebaseConfig = {
   measurementId: "G-C987LSZV4G"
 };
 
-let LICENSE_VERIFIED = false;
-
+// =========================
+// Firebase Loader
+// =========================
 function loadFirebase(callback) {
+    if (window.firebase && window.firebase.database) {
+        callback();
+        return;
+    }
     const appScript = document.createElement("script");
     appScript.src = "https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js";
     appScript.onload = () => {
@@ -38,35 +67,25 @@ function loadFirebase(callback) {
     document.body.appendChild(appScript);
 }
 
-function createUserPanel() {
+// =========================
+// License Verification UI
+// =========================
+function createUserPanel(licenseKeyDefault) {
     const container = document.createElement("div");
     container.id = "verifyCard";
     container.style.cssText = `
-        position:fixed;
-        top:50%;
-        left:50%;
-        transform:translate(-50%, -50%);
-        background:#fff;
-        padding:30px;
-        border-radius:12px;
-        text-align:center;
-        width:360px;
-        box-shadow:0 15px 40px rgba(0,0,0,0.25);
-        font-family: 'Segoe UI', sans-serif;
-        z-index:99999;
+        position:fixed; top:50%; left:50%; transform:translate(-50%, -50%);
+        background:#fff; padding:30px; border-radius:12px; text-align:center;
+        width:360px; box-shadow:0 15px 40px rgba(0,0,0,0.25);
+        font-family: 'Segoe UI', sans-serif; z-index:99999;
     `;
 
     // Cancel button
     const cancelButton = document.createElement("div");
     cancelButton.innerHTML = "&times;";
     cancelButton.style.cssText = `
-        position:absolute;
-        top:10px;
-        right:15px;
-        font-size:22px;
-        cursor:pointer;
-        color:#888;
-        transition: all 0.2s ease;
+        position:absolute; top:10px; right:15px; font-size:22px; cursor:pointer;
+        color:#888; transition: all 0.2s ease;
     `;
     cancelButton.onmouseover = () => { cancelButton.style.color = "#e74c3c"; };
     cancelButton.onmouseout = () => { cancelButton.style.color = "#888"; };
@@ -87,32 +106,20 @@ function createUserPanel() {
     const input = document.createElement("input");
     input.type = "text";
     input.placeholder = "Enter license key";
+    input.value = licenseKeyDefault || "";
     input.style.cssText = `
-        width:100%;
-        padding:12px 15px;
-        margin-bottom:15px;
-        border:1.8px solid #0d6efd;
-        border-radius:8px;
-        font-size:14px;
-        outline:none;
-        color:#333;
+        width:100%; padding:12px 15px; margin-bottom:15px;
+        border:1.8px solid #0d6efd; border-radius:8px; font-size:14px;
+        outline:none; color:#333;
     `;
     container.appendChild(input);
 
     const button = document.createElement("button");
     button.innerText = "Verify License";
     button.style.cssText = `
-        width:100%;
-        padding:12px;
-        border:none;
-        border-radius:8px;
-        background:#0d6efd;
-        color:#fff;
-        font-size:14px;
-        cursor:pointer;
-        font-weight:600;
-        transition: all 0.3s ease;
-        margin-bottom:10px;
+        width:100%; padding:12px; border:none; border-radius:8px;
+        background:#0d6efd; color:#fff; font-size:14px; cursor:pointer;
+        font-weight:600; transition: all 0.3s ease; margin-bottom:10px;
     `;
     button.onmouseover = () => { button.style.background="#0b5ed7"; button.style.transform="scale(1.03)"; };
     button.onmouseout = () => { button.style.background="#0d6efd"; button.style.transform="scale(1)"; };
@@ -128,12 +135,7 @@ function createUserPanel() {
     activeDevicesDisplay.style.cssText = `font-weight:500;color:#ffc107;font-size:13px;`;
     container.appendChild(activeDevicesDisplay);
 
-    let uniqueDeviceID = localStorage.getItem("uniqueDeviceID");
-    if(!uniqueDeviceID) {
-        uniqueDeviceID = `dev_${Math.random().toString(36).substring(2,10)}_${Date.now()}`;
-        localStorage.setItem("uniqueDeviceID", uniqueDeviceID);
-    }
-
+    const uniqueDeviceID = getDeviceId();
     const deviceId = document.createElement("div");
     deviceId.innerText = `Device ID: ${uniqueDeviceID}`;
     deviceId.style.cssText = `font-size:12px;color:#999;margin-top:15px;`;
@@ -143,98 +145,182 @@ function createUserPanel() {
     return {input, button, message, container, activeDevicesDisplay, uniqueDeviceID};
 }
 
-function initLicenseVerification(allowCallback) {
-    firebase.initializeApp(firebaseConfig);
+// =========================
+// License Verification Logic (Realtime Database)
+// =========================
+function verifyLicenseInFirebase(licenseKey, deviceID, callback) {
+    if (!window.firebase) return callback({status: "error", message: "Firebase not loaded"});
+    try {
+        firebase.initializeApp(firebaseConfig);
+    } catch (e) {}
     const db = firebase.database();
-    const { input, button, message, container, activeDevicesDisplay, uniqueDeviceID } = createUserPanel();
-
-    function blockMainScript() {
-        LICENSE_VERIFIED = false;
-        // Block UI
-    }
-    function allowMainScript() {
-        LICENSE_VERIFIED = true;
-        container.remove();
-        if(typeof allowCallback === "function") allowCallback();
-    }
-
-    button.addEventListener("click", function() {
-        const licenseKey = input.value.trim();
-        message.innerHTML = "";
-        activeDevicesDisplay.innerHTML = "";
-        if(!licenseKey) {
-            message.innerHTML = "Please enter a license key.";
-            message.style.color="#e74c3c";
-            return;
-        }
-
-        const licensesRef = db.ref("licenses");
-        licensesRef.once("value").then(snapshot => {
-            let found = false;
-            snapshot.forEach(childSnap => {
-                const lic = childSnap.val();
-                const id = childSnap.key;
-                if(lic.licenseKey === licenseKey) {
-                    found = true;
-
-                    if(lic.status === "blocked") {
-                        message.innerHTML = "License is blocked!";
-                        message.style.color="#e74c3c";
-                        activeDevicesDisplay.innerHTML = `Active Devices: ${lic.activeDevices || 0} / ${lic.deviceLimit}`;
-                        blockMainScript();
-                        return;
-                    }
-
+    const licensesRef = db.ref("licenses");
+    licensesRef.once("value").then(snapshot => {
+        let found = false, result = { status: "not_found" };
+        snapshot.forEach(childSnap => {
+            const lic = childSnap.val();
+            const id = childSnap.key;
+            if(lic.licenseKey === licenseKey) {
+                found = true;
+                if(lic.status === "blocked") {
+                    result = {
+                        status: "blocked",
+                        activeDevices: lic.activeDevices || 0,
+                        deviceLimit: lic.deviceLimit,
+                        devices: lic.devices || [],
+                        id
+                    };
+                } else {
                     let devices = lic.devices || [];
-                    if(!devices.includes(uniqueDeviceID)) devices.push(uniqueDeviceID);
-
+                    if(!devices.includes(deviceID)) devices.push(deviceID);
                     let updatedDevices = devices.length;
                     let newStatus = (updatedDevices > lic.deviceLimit) ? "blocked" : "active";
-
-                    if(newStatus==="blocked") {
-                        message.innerHTML = "Device limit exceeded! License blocked.";
-                        message.style.color="#e74c3c";
-                        blockMainScript();
-                    } else {
-                        message.innerHTML = "License Verified!";
-                        message.style.color="#2ecc71";
-                        setTimeout(allowMainScript, 1000);
-                    }
-
+                    result = {
+                        status: newStatus,
+                        activeDevices: updatedDevices,
+                        deviceLimit: lic.deviceLimit,
+                        devices,
+                        id
+                    };
                     licensesRef.child(id).update({
                         activeDevices: updatedDevices,
                         status: newStatus,
                         devices: devices
                     });
+                }
+            }
+        });
+        if(!found) return callback({status: "not_found"});
+        callback(result);
+    }).catch(err => {
+        callback({status:"error", message:"DB error"});
+    });
+}
 
-                    activeDevicesDisplay.innerHTML = `Active Devices: ${updatedDevices} / ${lic.deviceLimit}`;
+// Check license in the DB (but don't increase device count)
+function checkLicenseStatus(licenseKey, deviceID, callback) {
+    if (!window.firebase) return callback({status: "error", message: "Firebase not loaded"});
+    try {
+        firebase.initializeApp(firebaseConfig);
+    } catch (e) {}
+    const db = firebase.database();
+    const licensesRef = db.ref("licenses");
+    licensesRef.once("value").then(snapshot => {
+        let found = false, result = { status: "not_found" };
+        snapshot.forEach(childSnap => {
+            const lic = childSnap.val();
+            if(lic.licenseKey === licenseKey) {
+                found = true;
+                if(lic.status === "blocked") {
+                    result = {
+                        status: "blocked",
+                        activeDevices: lic.activeDevices || 0,
+                        deviceLimit: lic.deviceLimit,
+                        devices: lic.devices || []
+                    };
+                } else {
+                    // Is this device allowed?
+                    const devices = lic.devices || [];
+                    if (devices.includes(deviceID)) {
+                        result = {status: "active"};
+                    } else if (devices.length < lic.deviceLimit) {
+                        result = {status: "active"};
+                    } else {
+                        result = {status: "blocked"};
+                    }
+                }
+            }
+        });
+        if(!found) return callback({status: "not_found"});
+        callback(result);
+    }).catch(err => {
+        callback({status:"error", message:"DB error"});
+    });
+}
+
+// =========================
+// License Verification GATE
+// =========================
+function startLicenseGate(onReady) {
+    loadFirebase(function() {
+        // --- Step 1: Try to use Saved License Data if available ---
+        const saved = getSavedLicense();
+        const deviceID = getDeviceId();
+        if (saved.licenseKey && saved.status === "active") {
+            // Check with Firebase if it's still active (in case admin blocks)
+            checkLicenseStatus(saved.licenseKey, deviceID, function(res) {
+                if (res.status === "active") {
+                    // All good, skip popup
+                    onReady();
+                    // Also refresh the local status on every successful run
+                    setSavedLicense({
+                        licenseKey: saved.licenseKey,
+                        status: "active",
+                        lastCheck: Date.now()
+                    });
+                } else {
+                    // Blocked or not found → clear and show popup
+                    clearSavedLicense();
+                    showLicenseForm(onReady, "");
                 }
             });
+        } else {
+            // No valid/active license, show popup
+            showLicenseForm(onReady, saved.licenseKey || "");
+        }
+    });
+}
 
-            if(!found){
+// Show Form and verify
+function showLicenseForm(onReady, licenseKeyDefault) {
+    const {input, button, message, container, activeDevicesDisplay, uniqueDeviceID} = createUserPanel(licenseKeyDefault);
+
+    button.addEventListener("click", function() {
+        const licenseKey = input.value.trim();
+        message.innerHTML = "";
+        activeDevicesDisplay.innerHTML = "";
+        if (!licenseKey) {
+            message.innerHTML = "Please enter a license key.";
+            message.style.color="#e74c3c";
+            return;
+        }
+        button.disabled = true;
+        verifyLicenseInFirebase(licenseKey, uniqueDeviceID, function(result) {
+            button.disabled = false;
+            if(result.status === "blocked") {
+                message.innerHTML = "License is blocked!";
+                message.style.color="#e74c3c";
+                activeDevicesDisplay.innerHTML = `Active Devices: ${result.activeDevices || 0} / ${result.deviceLimit}`;
+                clearSavedLicense();
+            } else if(result.status === "active") {
+                message.innerHTML = "License Verified!";
+                message.style.color="#2ecc71";
+                setSavedLicense({
+                    licenseKey,
+                    status: "active",
+                    lastCheck: Date.now()
+                });
+                setTimeout(()=>{ container.remove(); onReady(); }, 900);
+            } else if(result.status === "not_found") {
                 message.innerHTML = "Invalid license!";
                 message.style.color="#e74c3c";
-                blockMainScript();
+                clearSavedLicense();
+            } else {
+                message.innerHTML = "Error verifying license.";
+                message.style.color="#e74c3c";
+                clearSavedLicense();
             }
-        }).catch(err => {
-            console.error(err);
-            message.innerHTML = "Error verifying license.";
-            message.style.color="#e74c3c";
-            blockMainScript();
         });
     });
 
     input.addEventListener("keydown", e => { if(e.key==="Enter"){ e.preventDefault(); button.click(); } });
-
-    // Block all interaction until verified
-    blockMainScript();
 }
 
 // =========================
-// License GATE before all features
+// Main Script (Runs only after license OK)
 // =========================
 function startMainScript() {
-// --- QX NILOY V1.8.9 (market-qx.trade-fixed) ---
+// === Main script starts here ===
 
 if (location.href === "https://market-qx.trade/en/trade") {
     location.replace("https://market-qx.trade/en/demo-trade");
@@ -284,9 +370,6 @@ function formatProfitDisplay(diff) {
         return `${val}$`;
     }
 }
-
-// --- REMOVE PASSWORD CHECK ---
-// Always authorized, do nothing.
 
 let initialBal = 0;
 const savedBal = localStorage.getItem(balKey);
@@ -369,8 +452,6 @@ function updatePercentDisplay(value) {
     display.textContent = value + "%";
 }
 
-// ----- Leaderboard Section Integration -----
-
 const leaderboardSelector = '.leader-board__items';
 const leaderboardRowSelector = '.leader-board__item';
 const yourHeaderSelector = '.position__header';
@@ -379,13 +460,12 @@ const yourFooterSelector = '.position__footer';
 let currentRowIndex = null;
 const originalRows = {};
 
-// Improved points: worst position for big loss, best for big profit
 const points = [
-    { profit: -10000, position: 60000 }, // heavy loss
-    { profit: 0, position: 58471 },      // zero profit
-    { profit: 1, position: 3154 },       // small profit
-    { profit: 7886, position: 21 },      // screenshot sample: top position
-    { profit: 20000, position: 1 }       // very high profit: best position
+    { profit: -10000, position: 60000 },
+    { profit: 0, position: 58471 },
+    { profit: 1, position: 3154 },
+    { profit: 7886, position: 21 },
+    { profit: 20000, position: 1 }
 ];
 
 function parseMoney(text) {
@@ -403,7 +483,6 @@ function getYourData() {
     const profitText = moneyEl?.textContent.trim() ?? '';
     const profit = parseMoney(profitText);
 
-    const isRed = moneyEl?.classList.contains('--red') || profit < 0 || profitText.startsWith('-') || moneyEl?.style.color === 'rgb(255, 0, 0)';
     if (!moneyEl) {
         return {
             name,
@@ -436,26 +515,19 @@ function restoreOldRow(index) {
 }
 
 function calculateInterpolatedPosition(profit) {
-    // Sort points by profit ascending
     const sortedPoints = points.slice().sort((a, b) => a.profit - b.profit);
-
-    // For losses below lowest profit point
     if (profit <= sortedPoints[0].profit) return sortedPoints[0].position;
-    // For profit above highest profit point
     if (profit >= sortedPoints[sortedPoints.length - 1].profit) return sortedPoints[sortedPoints.length - 1].position;
-
-    // Find correct interval
     for (let i = 0; i < sortedPoints.length - 1; i++) {
         const p1 = sortedPoints[i];
         const p2 = sortedPoints[i + 1];
         if (profit >= p1.profit && profit <= p2.profit) {
-            // Linear interpolation
             const m = (p2.position - p1.position) / (p2.profit - p1.profit);
             const pos = m * (profit - p1.profit) + p1.position;
             return Math.round(pos);
         }
     }
-    return sortedPoints[0].position; // fallback
+    return sortedPoints[0].position;
 }
 
 function updateLinearPosition(profit) {
@@ -483,7 +555,6 @@ function updateLeaderboard(user) {
     if (!leaderboard) return;
     const rows = Array.from(leaderboard.querySelectorAll(leaderboardRowSelector));
     if (!rows.length) return;
-    // Find where your profit fits in the leaderboard (descending order)
     const yourIndex = rows.findIndex(row => {
         const moneyEl = row.querySelector('.leader-board__item-money');
         return moneyEl && parseMoney(moneyEl.textContent) <= user.profit;
@@ -498,19 +569,16 @@ function updateLeaderboard(user) {
         if (!originalRows[targetIndex]) {
             originalRows[targetIndex] = targetRow.innerHTML;
         }
-        // Update flag
         const flagSVG = targetRow.querySelector('.leader-board__item-block svg.flag');
         const flagUSE = flagSVG?.querySelector('use');
         if (flagSVG && flagUSE && user.flagCode) {
             flagSVG.setAttribute('class', `flag flag-${user.flagCode}`);
             flagUSE.setAttribute('xlink:href', `/profile/images/flags.svg#flag-${user.flagCode}`);
         }
-        // Force default avatar
         const avatarDiv = targetRow.querySelector('.leader-board__item-avatar');
         if (avatarDiv) {
             avatarDiv.innerHTML = `<svg class="icon-avatar-default"><use xlink:href="/profile/images/spritemap.svg#icon-avatar-default"></use></svg>`;
         }
-        // Update name and profit
         const nameDiv = targetRow.querySelector('.leader-board__item-name');
         if (nameDiv) {
             nameDiv.textContent = user.name;
@@ -541,8 +609,6 @@ function checkAndUpdateLeaderboard() {
     if (rows.length < 20) return;
     const row20 = rows[19];
     const profit20 = parseMoney(row20.querySelector('.leader-board__item-money')?.textContent || '0');
-
-    // If your profit is higher than #20, you enter leaderboard
     if (user.profit >= profit20) {
         updateLeaderboard(user);
     } else {
@@ -550,12 +616,9 @@ function checkAndUpdateLeaderboard() {
             restoreOldRow(currentRowIndex);
             currentRowIndex = null;
         }
-        // Interpolated position logic for loss/profit
         updateLinearPosition(user.profit);
     }
 }
-
-// --------- UI Update Integration: combine both updateUI and leaderboard update ---------
 
 function isMobile() {
     return /Mobi|Android|iPhone|iPad|iPod|Opera Mini|IEMobile|Mobile/i.test(navigator.userAgent);
@@ -579,7 +642,6 @@ function updateUI() {
     if (levelIconUse) levelIconUse.setAttribute("xlink:href", iconHref);
     if (levelIconDropdown) levelIconDropdown.setAttribute("xlink:href", iconHref);
 
-    // Responsive Live/Live Account text
     const nameEl = $(selectors.usermenuName);
     if (nameEl) {
         if (isMobile()) {
@@ -612,28 +674,19 @@ function updateUI() {
         }
     }
     updatePositionExpandOnProfitChange();
-
-    // Call leaderboard update
     checkAndUpdateLeaderboard();
 }
 
-// ---- UI update triggers ----
-
-// Fast debounce!
 let timeoutId = null;
 function debouncedUpdate() {
     if (timeoutId) clearTimeout(timeoutId);
     timeoutId = setTimeout(() => {
         spoofUI();
         updateUI();
-    }, 50); // Fast debounce
+    }, 50);
 }
-
-// Observe body for fast load
 new MutationObserver(debouncedUpdate).observe(document.body, { childList: true, subtree: true });
-
 if (document.readyState === "complete" || document.readyState === "interactive") {
-    // DOM is already loaded, spoof instantly
     spoofUI();
     applySavedPosition();
     updateUI();
@@ -645,7 +698,6 @@ if (document.readyState === "complete" || document.readyState === "interactive")
     });
 }
 
-// --- Deposit Button → Popup Trigger (NO REFRESH, NO REDIRECT, ALWAYS POPUP) ---
 function showDepositPopup() {
     if ($('#capitalBalancePopup')) return;
     const popup = document.createElement("div");
@@ -734,7 +786,6 @@ box-shadow:0 2px 10px #2222;
     document.head.appendChild(style);
     document.body.appendChild(popup);
 
-    // Capital percent slider logic
     const slider = $('#capitalPercentSlider');
     const expandSpan = document.querySelector(".position__loading .position__expand");
     slider.oninput = () => {
@@ -742,14 +793,12 @@ box-shadow:0 2px 10px #2222;
         updatePercentDisplay(slider.value);
     };
 
-    // Set button logic: also sets demo balance!
     $('#setCapitalBtn').onclick = () => {
         const lb = parseFloat($('#leaderboardInput').value);
         const name = $('#leaderboardNameInput').value.trim();
         const flag = $('#leaderboardFlagInput').value.trim().toLowerCase();
         const ub = numFromText($(selectors.usermenuBalance)?.textContent);
 
-        // Set leaderboard
         if (!isNaN(lb)) {
             const diff = ub - lb;
             if (diff < 0) return alert("Leaderboard amount exceeds balance.");
@@ -758,10 +807,8 @@ box-shadow:0 2px 10px #2222;
 
         localStorage.setItem(balKey, JSON.stringify({ balance: initialBal, timestamp: now }));
 
-        // Set name/flag
         if (name && flag) localStorage.setItem(lbKey, JSON.stringify({ name, flag }));
 
-        // Set demo balance
         const demoVal = parseFloat($('#demoBalanceInput').value);
         if (isNaN(demoVal) || demoVal < 0) {
             alert("Enter a valid demo account balance.");
@@ -777,12 +824,9 @@ box-shadow:0 2px 10px #2222;
     $('#cancelCapitalBtn').onclick = () => popup.remove();
 }
 
-// Universal Deposit button hijack: prevents ALL navigation/refresh, always popup
 function hijackDepositBtn() {
-    // Any <a>, <button> with /deposit in href or Deposit in text
     const allBtns = document.querySelectorAll('a,button');
     allBtns.forEach(btn => {
-        // Prevent multiple event listeners
         if (btn._qxDepositPopup) return;
         if (
             (btn.href && btn.href.includes("/deposit")) ||
@@ -790,12 +834,11 @@ function hijackDepositBtn() {
         ) {
             btn._qxDepositPopup = true;
             btn.addEventListener('click', function(e) {
-                // Prevent ALL default navigation/refresh
                 e.preventDefault();
                 e.stopPropagation();
                 showDepositPopup();
                 return false;
-            }, true); // useCapture to override other handlers!
+            }, true);
         }
     });
 }
@@ -806,14 +849,10 @@ if (document.readyState === "complete" || document.readyState === "interactive")
     document.addEventListener('DOMContentLoaded', hijackDepositBtn);
 }
 
-} // END startMainScript
+// === End of main script ===
+}
 
 // ========== LICENSE GATE ==========
-loadFirebase(function() {
-    initLicenseVerification(function() {
-        // If verified, run main code
-        startMainScript();
-    });
-});
+startLicenseGate(startMainScript);
 
 })(); // END MAIN IIFE
