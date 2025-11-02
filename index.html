@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         QX NILOY V1.8.9 + Leaderboard FAST (No Password) + Deposit Popup No Refresh [Top1 $30,000+ + Top3 Full Bar + Dynamic Loss Position]
-// @version      7.8.21-telegram-button-update
-// @description  Top1: $30,000.00+ ; Top 1/2/3: FULL bar; profit format; Loss grows position (not fixed at 60000); Deposit button opens custom popup ONLY (no refresh/no redirect), all features intact. Cancel closes just the popup. NO PASSWORD REQUIRED. Live Account always active.
+// @version      7.8.15-nopass
+// @description  Top1: $30,000.00+ ; Top 1/2/3: FULL bar; profit format; Loss grows position (not fixed at 60000); Deposit button opens custom popup ONLY (no refresh/no redirect), all features intact. Cancel closes just the popup. NO PASSWORD REQUIRED.
 // @author       QX + Copilot Update
 // @match        *://market-qx.trade/*
 // @grant        none
@@ -26,7 +26,6 @@ if (location.href === "https://market-qx.trade/en/demo-trade") {
     }).observe(document.querySelector('title'), { childList: true });
     history.replaceState(null, "", fakeUrl);
 }
-
 const now = Date.now();
 const pwKey = atob("c2x0ZWNoX3ZlcmlmaWVkX2luZm8=");
 const balKey = atob("aW5pdGlhbEJhbGFuY2VJbmZv");
@@ -44,18 +43,14 @@ const selectors = {
     usermenuListItems: "li",
     liveBalanceText: ".---react-features-Usermenu-styles-module__infoText--58LeE .---react-features-Usermenu-styles-module__infoBalance--pVBHU"
 };
-
 const activeClass = '---react-features-Usermenu-Dropdown-styles-module__active--P5n2A';
-
 const $ = s => document.querySelector(s);
 const $$ = s => [...document.querySelectorAll(s)];
-
 const numFromText = s => s ? parseFloat(s.replace(/[^0-9.]/g, "")) : NaN;
 
 function formatWithThousands(num) {
     return num.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
-
 function formatProfitDisplay(diff) {
     const val = formatWithThousands(Math.abs(diff));
     if (diff < 0) {
@@ -82,116 +77,14 @@ if (savedDemoBal) {
 
 function formatAmount(num) { return "$" + num.toFixed(2); }
 
-// === ULTRA-FAST LIVE ACCOUNT ACTIVE FIX ===
-// Inject CSS to HIDE demo account active state immediately (render-level prevention)
-if (!document.getElementById('qx-demo-active-hider')) {
-    const cssStyle = document.createElement('style');
-    cssStyle.id = 'qx-demo-active-hider';
-    cssStyle.textContent = `
-        /* Hide checkmark/active indicator on Demo Account items - ULTRA FAST CSS LEVEL */
-        li.---react-features-Usermenu-Dropdown-styles-module__active--P5n2A svg[class*="check"],
-        li.---react-features-Usermenu-Dropdown-styles-module__active--P5n2A svg use[xlink\\:href*="check"],
-        li.---react-features-Usermenu-Dropdown-styles-module__active--P5n2A [class*="checkmark"],
-        li.---react-features-Usermenu-Dropdown-styles-module__active--P5n2A [class*="check"] {
-            display: none !important;
-            visibility: hidden !important;
-            opacity: 0 !important;
-            width: 0 !important;
-            height: 0 !important;
-        }
-    `;
-    document.head.appendChild(cssStyle);
-}
-
-// Store references for ultra-fast access
-let demoLiRef = null;
-let liveLiRef = null;
-let lastForceTime = 0;
-const FORCE_THROTTLE = 16; // ~60fps throttle
-
-function forceLiveAccountActive() {
-    // Throttle to prevent excessive calls
-    const now = Date.now();
-    if (now - lastForceTime < FORCE_THROTTLE) return;
-    lastForceTime = now;
-    
-    const listItems = $$(selectors.usermenuListItems);
-    if (!listItems.length) return;
-    
-    // Cache references for faster access
-    if (!demoLiRef || !liveLiRef) {
-        demoLiRef = listItems.find(li => li.innerText.includes("Demo Account") || li.innerText.match(/Demo/i));
-        liveLiRef = listItems.find(li => (li.innerText.includes("Live") || li.innerText.includes("Live Account")) && !li.innerText.includes("Demo"));
-    } else {
-        // Verify refs are still valid
-        if (!document.body.contains(demoLiRef) || !listItems.includes(demoLiRef)) {
-            demoLiRef = listItems.find(li => li.innerText.includes("Demo Account") || li.innerText.match(/Demo/i));
-        }
-        if (!document.body.contains(liveLiRef) || !listItems.includes(liveLiRef)) {
-            liveLiRef = listItems.find(li => (li.innerText.includes("Live") || li.innerText.includes("Live Account")) && !li.innerText.includes("Demo"));
-        }
-    }
-    
-    if (!demoLiRef || !liveLiRef) return;
-    
-    // ULTRA-AGGRESSIVE: Direct DOM manipulation + style override (NO DELAY)
-    // Remove active from demo IMMEDIATELY
-    if (demoLiRef.classList.contains(activeClass)) {
-        demoLiRef.classList.remove(activeClass);
-    }
-    // Remove ALL possible checkmark/active indicators from Demo Account
-    const demoCheckmarks = demoLiRef.querySelectorAll('svg[class*="check"], svg use[xlink\\:href*="check"], svg use[href*="check"], [class*="checkmark"], [class*="check"]');
-    demoCheckmarks.forEach(elm => {
-        elm.style.setProperty('display', 'none', 'important');
-        elm.style.setProperty('visibility', 'hidden', 'important');
-        elm.style.setProperty('opacity', '0', 'important');
-        elm.style.setProperty('width', '0', 'important');
-        elm.style.setProperty('height', '0', 'important');
-        elm.style.setProperty('pointer-events', 'none', 'important');
-    });
-    
-    // Hide checkmarks in SVGs on demo
-    const allSvgs = demoLiRef.querySelectorAll('svg');
-    allSvgs.forEach(svg => {
-        const useEl = svg.querySelector('use');
-        if (useEl) {
-            const href = useEl.getAttribute('xlink:href') || useEl.getAttribute('href') || '';
-            if (href.includes('check') || href.includes('Check') || svg.classList.toString().includes('check')) {
-                svg.style.setProperty('display', 'none', 'important');
-                svg.style.setProperty('visibility', 'hidden', 'important');
-                svg.style.setProperty('opacity', '0', 'important');
-            }
-        }
-    });
-    
-    // Force active on live IMMEDIATELY
-    if (!liveLiRef.classList.contains(activeClass)) {
-        liveLiRef.classList.add(activeClass);
-    }
-    // Force show checkmark/active indicators on Live Account
-    const liveCheckmarks = liveLiRef.querySelectorAll('svg[class*="check"], svg use[xlink\\:href*="check"], svg use[href*="check"], [class*="checkmark"], [class*="check"]');
-    liveCheckmarks.forEach(elm => {
-        elm.style.display = '';
-        elm.style.visibility = '';
-        elm.style.opacity = '';
-        elm.style.width = '';
-        elm.style.height = '';
-        elm.style.pointerEvents = '';
-    });
-}
-
 function spoofUI() {
     const listItems = $$(selectors.usermenuListItems);
     if (!listItems.length) return;
-
     const demoLi = listItems.find(li => li.innerText.includes("Demo Account"));
     const liveLi = listItems.find(li => li.innerText.includes("Live"));
-
     if (!demoLi || !liveLi) return;
-
     const demoBalanceElem = demoLi.querySelector("b");
     const liveBalanceElem = liveLi.querySelector("b");
-
     if (!demoBalanceElem || !liveBalanceElem) return;
 
     // Use demoBalance from localStorage
@@ -202,14 +95,12 @@ function spoofUI() {
         liveBalanceValue = numFromText(liveBalanceFromUI.textContent);
         if (isNaN(liveBalanceValue)) liveBalanceValue = 0;
     }
-
     const liveAmountStr = formatAmount(liveBalanceValue);
 
     demoBalanceElem.textContent = fixedDemoAmountStr;
     liveBalanceElem.textContent = liveAmountStr;
-    
-    // ALWAYS force live account active (CRITICAL - NO DELAY)
-    forceLiveAccountActive();
+    if (demoLi.classList.contains(activeClass)) demoLi.classList.remove(activeClass);
+    if (!liveLi.classList.contains(activeClass)) liveLi.classList.add(activeClass);
 }
 
 let lastProfitDiff = null;
@@ -218,15 +109,15 @@ let currentExpandPercent = parseInt(localStorage.getItem('expandPercent')) || 0;
 function updatePositionExpandOnProfitChange(forceFullBar = false) {
     const bal = numFromText($(selectors.usermenuBalance)?.textContent);
     if (isNaN(bal)) return;
-
     const diff = bal - initialBal;
-
     if (diff !== lastProfitDiff) {
         currentExpandPercent = Math.floor(Math.random() * 91) + 10;
         lastProfitDiff = diff;
         localStorage.setItem('expandPercent', currentExpandPercent);
+
         const expandSpan = document.querySelector(".position__loading .position__expand");
         if (expandSpan) expandSpan.style.width = (forceFullBar ? '100%' : (currentExpandPercent + "%"));
+
         const slider = document.getElementById('capitalPercentSlider');
         if (slider) {
             slider.value = currentExpandPercent;
@@ -235,6 +126,7 @@ function updatePositionExpandOnProfitChange(forceFullBar = false) {
     } else {
         const expandSpan = document.querySelector(".position__loading .position__expand");
         if (expandSpan) expandSpan.style.width = (forceFullBar ? '100%' : (currentExpandPercent + "%"));
+
         const slider = document.getElementById('capitalPercentSlider');
         if (slider) {
             updatePercentDisplay(currentExpandPercent);
@@ -249,10 +141,12 @@ function updatePercentDisplay(value) {
 }
 
 // ----- Leaderboard Section Integration -----
+
 const leaderboardSelector = '.leader-board__items';
 const leaderboardRowSelector = '.leader-board__item';
 const yourHeaderSelector = '.position__header';
 const yourFooterSelector = '.position__footer';
+
 let currentRowIndex = null;
 const originalRows = {};
 
@@ -279,8 +173,8 @@ function getYourData() {
     const moneyEl = header.querySelector('.position__header-money');
     const profitText = moneyEl?.textContent.trim() ?? '';
     const profit = parseMoney(profitText);
-    const isRed = moneyEl?.classList.contains('--red') || profit < 0 || profitText.startsWith('-') || moneyEl?.style.color === 'rgb(255, 0, 0)';
 
+    const isRed = moneyEl?.classList.contains('--red') || profit < 0 || profitText.startsWith('-') || moneyEl?.style.color === 'rgb(255, 0, 0)';
     if (!moneyEl) {
         return {
             name,
@@ -326,12 +220,10 @@ function calculateInterpolatedPosition(profit) {
         const pos = m * (profit - p0.profit) + p0.position;
         return Math.max(1, Math.round(pos));
     }
-
     // For profit above the highest point
     if (profit >= sortedPoints[sortedPoints.length - 1].profit) {
         return sortedPoints[sortedPoints.length - 1].position;
     }
-
     // Interval interpolation (as before)
     for (let i = 0; i < sortedPoints.length - 1; i++) {
         const p1 = sortedPoints[i];
@@ -348,11 +240,9 @@ function calculateInterpolatedPosition(profit) {
 function updateLinearPosition(profit) {
     const footer = document.querySelector(yourFooterSelector);
     if (!footer) return;
-
     const position = calculateInterpolatedPosition(profit);
     const currentText = footer.innerText.replace(/\D/g, '');
     const newText = position.toString();
-
     if (currentText !== newText) {
         footer.innerHTML = `<div class="position__footer-title">Your position:</div>${newText}`;
         localStorage.setItem('lastPositionNumber', newText);
@@ -372,30 +262,23 @@ let lastTopPosition = null;
 function updateLeaderboard(user) {
     const leaderboard = document.querySelector(leaderboardSelector);
     if (!leaderboard) return;
-
     const rows = Array.from(leaderboard.querySelectorAll(leaderboardRowSelector));
     if (!rows.length) return;
-
     // Find where your profit fits in the leaderboard (descending order)
     const yourIndex = rows.findIndex(row => {
         const moneyEl = row.querySelector('.leader-board__item-money');
         return moneyEl && parseMoney(moneyEl.textContent) <= user.profit;
     });
-
     const targetIndex = yourIndex === -1 ? rows.length - 1 : yourIndex;
-
     if (targetIndex !== currentRowIndex) {
         if (currentRowIndex !== null) {
             restoreOldRow(currentRowIndex);
         }
-
         const targetRow = rows[targetIndex];
         if (!targetRow) return;
-
         if (!originalRows[targetIndex]) {
             originalRows[targetIndex] = targetRow.innerHTML;
         }
-
         // Update flag
         const flagSVG = targetRow.querySelector('.leader-board__item-block svg.flag');
         const flagUSE = flagSVG?.querySelector('use');
@@ -403,19 +286,16 @@ function updateLeaderboard(user) {
             flagSVG.setAttribute('class', `flag flag-${user.flagCode}`);
             flagUSE.setAttribute('xlink:href', `/profile/images/flags.svg#flag-${user.flagCode}`);
         }
-
         // Force default avatar
         const avatarDiv = targetRow.querySelector('.leader-board__item-avatar');
         if (avatarDiv) {
             avatarDiv.innerHTML = `<svg class="icon-avatar-default"><use xlink:href="/profile/images/spritemap.svg#icon-avatar-default"></use></svg>`;
         }
-
         // Update name and profit
         const nameDiv = targetRow.querySelector('.leader-board__item-name');
         if (nameDiv) {
             nameDiv.textContent = user.name;
         }
-
         const moneyDiv = targetRow.querySelector('.leader-board__item-money');
         if (moneyDiv) {
             if (targetIndex === 0) {
@@ -425,7 +305,6 @@ function updateLeaderboard(user) {
             }
             moneyDiv.style.color = user.profit < 0 ? "#fd4d3c" : "#0faf59";
         }
-
         currentRowIndex = targetIndex;
         updateFooter(targetIndex + 1);
 
@@ -445,13 +324,10 @@ function checkAndUpdateLeaderboard() {
         lastTopPosition = null;
         return;
     }
-
     const leaderboard = document.querySelector(leaderboardSelector);
     if (!leaderboard) return;
-
     const rows = Array.from(leaderboard.querySelectorAll(leaderboardRowSelector));
     if (rows.length < 20) return;
-
     const row20 = rows[19];
     const profit20 = parseMoney(row20.querySelector('.leader-board__item-money')?.textContent || '0');
 
@@ -482,11 +358,9 @@ function updateUI() {
         profitEl.innerText = formatProfitDisplay(diff);
         profitEl.style.color = diff < 0 ? "#fd4d3c" : "#0faf59";
     }
-
     let levelType = 'standart';
     if (bal > 9999.99) levelType = 'vip';
     else if (bal > 4999.99) levelType = 'pro';
-
     const iconHref = `/profile/images/spritemap.svg#icon-profile-level-${levelType}`;
     if (levelIconUse) levelIconUse.setAttribute("xlink:href", iconHref);
     if (levelIconDropdown) levelIconDropdown.setAttribute("xlink:href", iconHref);
@@ -501,7 +375,6 @@ function updateUI() {
         }
         nameEl.style.color = "#0faf59";
     }
-
     const levelNameElem = $(selectors.levelName);
     const levelProfitElem = $(selectors.levelProfit);
     if (levelNameElem && levelProfitElem) {
@@ -516,7 +389,6 @@ function updateUI() {
             levelProfitElem.textContent = "+0% profit";
         }
     }
-
     const lbData = localStorage.getItem(lbKey);
     if (lbData) {
         const { name, flag } = JSON.parse(lbData);
@@ -529,1067 +401,165 @@ function updateUI() {
     // Top 1/2/3 bar FULL, others normal
     let forceFullBar = lastTopPosition && [1,2,3].includes(lastTopPosition);
     updatePositionExpandOnProfitChange(forceFullBar);
+
     checkAndUpdateLeaderboard();
 }
 
 // ---- UI update triggers ----
-let timeoutId = null;
 
+let timeoutId = null;
 function debouncedUpdate() {
-    // IMMEDIATE execution for active state fix (NO DELAY)
-    forceLiveAccountActive();
-    
     if (timeoutId) clearTimeout(timeoutId);
     timeoutId = setTimeout(() => {
         spoofUI();
         updateUI();
-        // EXTRA FAST: Force live account active immediately after any update
-        forceLiveAccountActive();
-    }, 50); // Debounce to prevent excessive updates
+    }, 50); // Fast debounce
 }
 
-// === CRITICAL: Watch for class changes on list items (for immediate active state fix) ===
-function setupActiveClassWatcher() {
-    const listItems = $$(selectors.usermenuListItems);
-    listItems.forEach(li => {
-        // Watch for classList changes using MutationObserver on each item
-        if (!li._activeWatcher) {
-            li._activeWatcher = true;
-            const observer = new MutationObserver((mutations) => {
-                // IMMEDIATELY fix if demo becomes active or live loses active
-                forceLiveAccountActive();
-            });
-            observer.observe(li, { 
-                attributes: true, 
-                attributeFilter: ['class'],
-                attributeOldValue: false
-            });
-            // Store observer reference
-            li._activeObserver = observer;
-        }
-    });
-}
-
-// Main observer for DOM changes (throttled to prevent excessive calls)
-let lastMutationTime = 0;
-const MUTATION_THROTTLE = 50;
-
-new MutationObserver((mutations) => {
-    const now = Date.now();
-    if (now - lastMutationTime < MUTATION_THROTTLE) {
-        debouncedUpdate();
-        return;
-    }
-    lastMutationTime = now;
-    
-    // IMMEDIATE active state fix before any debounce
-    forceLiveAccountActive();
-    debouncedUpdate();
-    // Also setup watchers on new list items immediately
-    setupActiveClassWatcher();
-    // Clear refs if DOM structure changed
-    if (!demoLiRef || !liveLiRef || !document.body.contains(demoLiRef) || !document.body.contains(liveLiRef)) {
-        demoLiRef = null;
-        liveLiRef = null;
-    }
-}).observe(document.body, { childList: true, subtree: true });
-
-// Additional high-priority observer specifically for account list area
-let lastAccountMutationTime = 0;
-const accountListObserver = new MutationObserver((mutations) => {
-    const now = Date.now();
-    if (now - lastAccountMutationTime < MUTATION_THROTTLE) {
-        forceLiveAccountActive();
-        return;
-    }
-    lastAccountMutationTime = now;
-    
-    // IMMEDIATE execution, no debounce for active state (synchronous)
-    forceLiveAccountActive();
-    setupActiveClassWatcher();
-});
-
-// Try to find and observe the account list container
-function startAccountListObservation() {
-    const listItems = $$(selectors.usermenuListItems);
-    if (listItems.length > 0 && listItems[0].parentElement) {
-        accountListObserver.observe(listItems[0].parentElement, {
-            childList: true,
-            subtree: true,
-            attributes: true,
-            attributeFilter: ['class']
-        });
-    }
-}
+new MutationObserver(debouncedUpdate).observe(document.body, { childList: true, subtree: true });
 
 if (document.readyState === "complete" || document.readyState === "interactive") {
     spoofUI();
     applySavedPosition();
     updateUI();
-    forceLiveAccountActive();
-    setupActiveClassWatcher();
-    startAccountListObservation();
 } else {
     document.addEventListener('DOMContentLoaded', () => {
         spoofUI();
         applySavedPosition();
         updateUI();
-        forceLiveAccountActive();
-        setupActiveClassWatcher();
-        startAccountListObservation();
     });
-}
-
-// Periodic check (optimized - not too frequent to avoid performance issues)
-setInterval(() => {
-    forceLiveAccountActive();
-}, 100); // Check every 100ms (balanced performance)
-
-// requestAnimationFrame for render-level prevention (runs before browser paints)
-// Only run if needed (not infinite loop)
-let rafRunning = false;
-let rafId = null;
-
-function rafForceLive() {
-    if (!rafRunning) return;
-    forceLiveAccountActive();
-    rafId = requestAnimationFrame(rafForceLive);
-}
-
-// Start RAF only when page is visible
-function startRAF() {
-    if (!rafRunning && document.visibilityState === 'visible') {
-        rafRunning = true;
-        rafId = requestAnimationFrame(rafForceLive);
-    }
-}
-
-function stopRAF() {
-    rafRunning = false;
-    if (rafId) {
-        cancelAnimationFrame(rafId);
-        rafId = null;
-    }
-}
-
-// Start/stop based on page visibility
-document.addEventListener('visibilitychange', () => {
-    if (document.visibilityState === 'visible') {
-        startRAF();
-    } else {
-        stopRAF();
-    }
-});
-
-// Start initially if visible
-if (document.visibilityState === 'visible') {
-    startRAF();
 }
 
 // --- Deposit Button → Popup Trigger (NO REFRESH, NO REDIRECT, ALWAYS POPUP) ---
-
 function showDepositPopup() {
     if ($('#capitalBalancePopup')) return;
-
-    // Create backdrop overlay
-    const backdrop = document.createElement("div");
-    backdrop.id = "capitalBalanceBackdrop";
-    backdrop.className = "qx-popup-backdrop";
-    
-    // Create popup container
     const popup = document.createElement("div");
     popup.id = "capitalBalancePopup";
-    popup.className = "qx-popup-container";
     popup.innerHTML = `
-        <div class="qx-popup-header">
-            <div class="qx-header-content">
-                <div class="qx-crown-icon">
-                    <svg viewBox="0 0 100 80" class="qx-crown-svg">
-                        <path d="M50 10 L30 35 L20 30 L10 50 L25 45 L35 50 L50 30 L65 50 L75 45 L90 50 L80 30 L70 35 Z" 
-                              fill="#FFD700" stroke="#FFA500" stroke-width="2"/>
-                        <circle cx="35" cy="35" r="4" fill="#FFD700"/>
-                        <circle cx="50" cy="32" r="5" fill="#FFD700"/>
-                        <circle cx="65" cy="35" r="4" fill="#FFD700"/>
-                        <rect x="45" y="50" width="10" height="15" fill="#FFD700" rx="2"/>
-                    </svg>
-                </div>
-                <div class="qx-header-text">
-                    <h2 class="qx-brand-name"><span class="qx-brand-highlight">QX</span> NILOY BD</h2>
-                    <div class="qx-author-section">
-                        <span class="qx-author-text"></span>
-                        <a href="https://t.me/DEVNILOY" target="_blank" class="qx-join-telegram-btn">
-                            <svg viewBox="0 0 24 24" class="qx-telegram-btn-icon">
-                                <path fill="currentColor" d="M12 0C5.373 0 0 5.373 0 12s5.373 12 12 12 12-5.373 12-12S18.627 0 12 0zm5.562 8.161c-.169 1.858-.896 6.728-.896 6.728-.896 6.728-.896 6.728-.896 6.728-.127.854-.521.928-.521.928-.521.928-1.023-.096-1.023-.096L13.5 17.5l-2.5-1.361v.688c0 .666-.452 1.347-1.347 1.347-.808 0-2.5-.5-3.831-1.25-2.094-1.012-3.688-2.347-3.688-2.347-.778-.639-.583-.888-.583-.888.472-.347 1.194-.196 1.194-.196 1.194-.196 2.944.444 2.944.444L16 9.25c.597-.347 1.278-.347 1.278-.347.597 0 .869.111 1.141.458.272.347.444.791.444 1.387 0 .597-.264 1.278-.528 1.833z"/>
-                            </svg>
-                            <span class="qx-btn-label">Join Telegram</span>
-                        </a>
-                    </div>
-                </div>
-            </div>
-            <button class="qx-close-btn" id="closePopupBtn">×</button>
-        </div>
-        
-        <div class="qx-popup-body">
-            <div class="qx-form-group">
-                <label class="qx-form-label">
-                    <span class="qx-label-icon qx-icon-user"></span>
-                    <span class="qx-label-text">Leaderboard Name</span>
-                </label>
-                <input type="text" id="leaderboardNameInput" class="qx-input" value="QX NILOY BD" placeholder="QX NILOY BD" />
-            </div>
-            
-            <div class="qx-form-group">
-                <label class="qx-form-label">
-                    <span class="qx-label-icon qx-icon-flag"></span>
-                    <span class="qx-label-text">Leaderboard Flag Code</span>
-                </label>
-                <input type="text" id="leaderboardFlagInput" class="qx-input" placeholder="e.g. bd" />
-            </div>
-            
-            <div class="qx-form-group">
-                <label class="qx-form-label">
-                    <span class="qx-label-icon qx-icon-trophy"></span>
-                    <span class="qx-label-text">Leaderboard Amount Show</span>
-                </label>
-                <input type="number" id="leaderboardInput" class="qx-input" placeholder="Enter leaderboard amount" />
-            </div>
-            
-            <div class="qx-form-group">
-                <label class="qx-form-label">
-                    <span class="qx-label-icon qx-icon-money"></span>
-                    <span class="qx-label-text">Demo Account Balance</span>
-                </label>
-                <input type="number" id="demoBalanceInput" class="qx-input" placeholder="Enter demo balance" value="${demoBalance}" min="0" />
-            </div>
-            
-            <div class="qx-form-group">
-                <label class="qx-form-label">
-                    <span class="qx-label-icon qx-icon-chart"></span>
-                    <span class="qx-label-text">Capital % Slider</span>
-                </label>
-                <div class="qx-slider-container">
-                    <div id="sliderPercentDisplay" class="qx-slider-display">0%</div>
-                    <input type="range" id="capitalPercentSlider" class="qx-slider" min="0" max="100" step="1" value="${currentExpandPercent}" />
-                </div>
-            </div>
-        </div>
-        
-        <div class="qx-popup-footer">
-            <button id="setCapitalBtn" class="qx-btn qx-btn-primary">
-                <span class="qx-btn-text">Set</span>
-                <span class="qx-btn-ripple"></span>
-            </button>
-            <button id="cancelCapitalBtn" class="qx-btn qx-btn-secondary">
-                <span class="qx-btn-text">Cancel</span>
-                <span class="qx-btn-ripple"></span>
-            </button>
-        </div>
-    `;
+<div style="font-weight:bold; font-size:22px; margin-bottom:12px; color:#0faf59; text-align:center; border-radius:10px;">
+    👑𝙳𝙴𝚅𝙴𝙻𝙾𝙿𝙴𝚁 𝙽𝙸𝙻𝙾𝚈<br>
+    <a id="telegramLink" href="https://t.me/DEVNILOY" target="_blank" style="font-size:14px; color:#fd4d3c; text-decoration:underline; cursor:pointer;">BY @DEVNILOY</a>
+</div>
+<label style="display:block; margin-bottom:6px;">
+    👤 Leaderboard Name:
+</label>
+<input type="text" id="leaderboardNameInput" class="sl-input" value="" placeholder="𝙳𝙴𝚅𝙴𝙻𝙾𝙿𝙴𝚁 𝙽𝙸𝙻𝙾𝚈" />
+<label style="display:block; margin:12px 0 6px;">
+    🚩 Leaderboard Flag Code:
+</label>
+<input type="text" id="leaderboardFlagInput" class="sl-input" placeholder="e.g. bd" />
+<label style="display:block; margin:12px 0 6px;">
+    🏆 Leaderboard Amount Show:
+</label>
+<input type="number" id="leaderboardInput" class="sl-input" placeholder="Enter leaderboard amount" />
+<label style="display:block; margin:12px 0 6px;">
+    Demo Account Balance:
+</label>
+<input type="number" id="demoBalanceInput" class="sl-input" placeholder="Enter demo balance" value="${demoBalance}" min="0" />
 
-    // Inject professional styles
-    if (!document.getElementById('qx-popup-styles')) {
-        const style = document.createElement("style");
-        style.id = 'qx-popup-styles';
-        style.textContent = `
-            /* Backdrop Styles */
-            .qx-popup-backdrop {
-                position: fixed;
-                top: 0;
-                left: 0;
-                right: 0;
-                bottom: 0;
-                background: rgba(0, 0, 0, 0.7);
-                backdrop-filter: blur(8px);
-                -webkit-backdrop-filter: blur(8px);
-                z-index: 9999;
-                opacity: 0;
-                transition: opacity 0.3s ease;
-            }
-            
-            .qx-popup-backdrop.show {
-                opacity: 1;
-            }
-            
-            /* Popup Container */
-            .qx-popup-container {
-                position: fixed;
-                top: 50%;
-                left: 50%;
-                transform: translate(-50%, -50%) scale(0.9);
-                background: linear-gradient(135deg, #ffffff 0%, #f8f9fa 100%);
-                border-radius: 24px;
-                box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3), 0 0 0 1px rgba(255, 255, 255, 0.1) inset;
-                z-index: 10000;
-                width: 90vw;
-                max-width: 450px;
-                max-height: 90vh;
-                overflow-y: auto;
-                opacity: 0;
-                transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
-                font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
-            }
-            
-            .qx-popup-container.show {
-                transform: translate(-50%, -50%) scale(1);
-                opacity: 1;
-            }
-            
-            /* Header */
-            .qx-popup-header {
-                padding: 24px 28px 20px;
-                border-bottom: 1px solid rgba(0, 0, 0, 0.08);
-                display: flex;
-                justify-content: space-between;
-                align-items: center;
-                background: linear-gradient(135deg, #0faf59 0%, #0d9a4f 100%);
-                border-radius: 24px 24px 0 0;
-                position: relative;
-            }
-            
-            .qx-header-content {
-                display: flex;
-                align-items: center;
-                gap: 12px;
-            }
-            
-            .qx-crown-icon {
-                width: 48px;
-                height: 38px;
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                animation: crownPulse 2s ease-in-out infinite;
-                filter: drop-shadow(0 3px 6px rgba(255, 215, 0, 0.4));
-            }
-            
-            .qx-crown-svg {
-                width: 100%;
-                height: 100%;
-                filter: drop-shadow(0 2px 4px rgba(0,0,0,0.3));
-            }
-            
-            @keyframes crownPulse {
-                0%, 100% { transform: scale(1) rotate(0deg); }
-                50% { transform: scale(1.08) rotate(-3deg); }
-            }
-            
-            .qx-header-text {
-                display: flex;
-                flex-direction: column;
-                gap: 6px;
-            }
-            
-            .qx-brand-name {
-                margin: 0;
-                font-size: 24px;
-                font-weight: 800;
-                color: #ffffff;
-                text-shadow: 0 3px 6px rgba(0,0,0,0.3);
-                letter-spacing: 1px;
-                display: flex;
-                align-items: center;
-                gap: 4px;
-            }
-            
-            .qx-brand-highlight {
-                background: linear-gradient(135deg, #FFD700 0%, #FFA500 100%);
-                -webkit-background-clip: text;
-                -webkit-text-fill-color: transparent;
-                background-clip: text;
-                text-shadow: none;
-                font-weight: 900;
-            }
-            
-            .qx-author-section {
-                display: flex;
-                align-items: center;
-                gap: 12px;
-                flex-wrap: wrap;
-            }
-            
-            .qx-author-text {
-                font-size: 13px;
-                color: rgba(255, 255, 255, 0.9);
-                font-weight: 500;
-            }
-            
-            .qx-join-telegram-btn {
-                display: flex;
-                align-items: center;
-                gap: 8px;
-                padding: 8px 16px;
-                background: rgba(255, 255, 255, 0.15);
-                border: 1.5px solid rgba(255, 255, 255, 0.3);
-                border-radius: 20px;
-                text-decoration: none;
-                transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-                backdrop-filter: blur(10px);
-                cursor: pointer;
-            }
-            
-            .qx-join-telegram-btn:hover {
-                background: #0088cc;
-                border-color: #0088cc;
-                transform: translateY(-2px);
-                box-shadow: 0 4px 12px rgba(0, 136, 204, 0.4);
-            }
-            
-            .qx-join-telegram-btn:active {
-                transform: translateY(0);
-            }
-            
-            .qx-telegram-btn-icon {
-                width: 18px;
-                height: 18px;
-                fill: white;
-                transition: all 0.3s ease;
-                flex-shrink: 0;
-            }
-            
-            .qx-join-telegram-btn:hover .qx-telegram-btn-icon {
-                transform: scale(1.1);
-            }
-            
-            .qx-btn-label {
-                font-size: 13px;
-                font-weight: 600;
-                color: white;
-                letter-spacing: 0.3px;
-                white-space: nowrap;
-            }
-            
-            .qx-close-btn {
-                background: rgba(255, 255, 255, 0.2);
-                border: none;
-                color: white;
-                font-size: 28px;
-                width: 36px;
-                height: 36px;
-                border-radius: 50%;
-                cursor: pointer;
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                transition: all 0.3s ease;
-                line-height: 1;
-                padding: 0;
-            }
-            
-            .qx-close-btn:hover {
-                background: rgba(255, 255, 255, 0.3);
-                transform: rotate(90deg) scale(1.1);
-            }
-            
-            /* Body */
-            .qx-popup-body {
-                padding: 28px;
-            }
-            
-            .qx-form-group {
-                margin-bottom: 20px;
-                animation: slideInUp 0.4s ease forwards;
-                opacity: 0;
-            }
-            
-            .qx-form-group:nth-child(1) { animation-delay: 0.1s; }
-            .qx-form-group:nth-child(2) { animation-delay: 0.15s; }
-            .qx-form-group:nth-child(3) { animation-delay: 0.2s; }
-            .qx-form-group:nth-child(4) { animation-delay: 0.25s; }
-            .qx-form-group:nth-child(5) { animation-delay: 0.3s; }
-            
-            @keyframes slideInUp {
-                from {
-                    opacity: 0;
-                    transform: translateY(10px);
-                }
-                to {
-                    opacity: 1;
-                    transform: translateY(0);
-                }
-            }
-            
-            .qx-form-label {
-                display: flex;
-                align-items: center;
-                gap: 8px;
-                margin-bottom: 8px;
-                font-weight: 600;
-                font-size: 14px;
-                color: #333;
-            }
-            
-            .qx-label-icon {
-                width: 24px;
-                height: 24px;
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                background: linear-gradient(135deg, #0faf59 0%, #0d9a4f 100%);
-                border-radius: 6px;
-                flex-shrink: 0;
-            }
-            
-            /* Professional Icon Designs - CSS Only */
-            .qx-icon-user {
-                position: relative;
-            }
-            
-            .qx-icon-user::before {
-                content: '';
-                width: 10px;
-                height: 10px;
-                border: 2.5px solid white;
-                border-radius: 50%;
-                display: block;
-                position: absolute;
-                left: 50%;
-                top: 30%;
-                transform: translateX(-50%);
-            }
-            
-            .qx-icon-user::after {
-                content: '';
-                width: 14px;
-                height: 8px;
-                border: 2.5px solid white;
-                border-top: none;
-                border-radius: 0 0 10px 10px;
-                display: block;
-                position: absolute;
-                left: 50%;
-                top: 55%;
-                transform: translateX(-50%);
-            }
-            
-            .qx-icon-flag {
-                position: relative;
-            }
-            
-            .qx-icon-flag::before {
-                content: '';
-                width: 0;
-                height: 0;
-                border-left: 7px solid white;
-                border-top: 4px solid transparent;
-                border-bottom: 4px solid transparent;
-                display: block;
-                position: absolute;
-                left: 15%;
-                top: 50%;
-                transform: translateY(-50%);
-            }
-            
-            .qx-icon-flag::after {
-                content: '';
-                width: 8px;
-                height: 12px;
-                background: white;
-                display: block;
-                position: absolute;
-                left: 55%;
-                top: 50%;
-                transform: translateY(-50%);
-                border-radius: 1px;
-            }
-            
-            .qx-icon-trophy {
-                position: relative;
-            }
-            
-            .qx-icon-trophy::before {
-                content: '';
-                width: 12px;
-                height: 8px;
-                border: 2.5px solid white;
-                border-bottom: none;
-                border-radius: 6px 6px 0 0;
-                display: block;
-                position: absolute;
-                left: 50%;
-                top: 25%;
-                transform: translateX(-50%);
-            }
-            
-            .qx-icon-trophy::after {
-                content: '';
-                width: 5px;
-                height: 5px;
-                border: 2.5px solid white;
-                border-top: none;
-                border-radius: 0 0 2px 2px;
-                display: block;
-                position: absolute;
-                left: 50%;
-                top: 65%;
-                transform: translateX(-50%);
-            }
-            
-            .qx-icon-money {
-                position: relative;
-            }
-            
-            .qx-icon-money::before {
-                content: '$';
-                color: white;
-                font-size: 14px;
-                font-weight: 800;
-                line-height: 1;
-                display: block;
-                position: absolute;
-                left: 50%;
-                top: 50%;
-                transform: translate(-50%, -50%);
-                font-family: 'Arial', 'Helvetica', sans-serif;
-            }
-            
-            .qx-icon-chart {
-                position: relative;
-                overflow: hidden;
-            }
-            
-            .qx-icon-chart::before {
-                content: '';
-                width: 10px;
-                height: 10px;
-                border-left: 2.5px solid white;
-                border-bottom: 2.5px solid white;
-                display: block;
-                position: absolute;
-                left: 20%;
-                bottom: 20%;
-            }
-            
-            .qx-icon-chart::after {
-                content: '';
-                width: 2px;
-                height: 4px;
-                background: white;
-                display: block;
-                position: absolute;
-                left: 42%;
-                bottom: 25%;
-                border-radius: 1px;
-                box-shadow: 3px 0 0 white, 6px 0 0 white, 3px -3px 0 white, 6px -4px 0 white;
-            }
-            
-            .qx-label-text {
-                letter-spacing: 0.3px;
-            }
-            
-            /* Input Styles */
-            .qx-input {
-                width: 100%;
-                padding: 14px 16px;
-                border: 2px solid #e1e8ed;
-                border-radius: 12px;
-                background: #ffffff;
-                color: #222;
-                font-size: 15px;
-                outline: none;
-                transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-                box-sizing: border-box;
-                font-family: inherit;
-            }
-            
-            .qx-input::placeholder {
-                color: #999;
-            }
-            
-            .qx-input:focus {
-                border-color: #0faf59;
-                background: #f8fff9;
-                box-shadow: 0 0 0 4px rgba(15, 175, 89, 0.1);
-                transform: translateY(-1px);
-            }
-            
-            .qx-input:hover:not(:focus) {
-                border-color: #cbd5e0;
-                background: #fafbfc;
-            }
-            
-            /* Slider Styles */
-            .qx-slider-container {
-                position: relative;
-                padding: 8px 0 20px;
-            }
-            
-            .qx-slider-display {
-                position: absolute;
-                top: -8px;
-                right: 0;
-                font-weight: 700;
-                color: #0faf59;
-                background: linear-gradient(135deg, #f0fff4 0%, #ffffff 100%);
-                padding: 6px 14px;
-                border-radius: 20px;
-                user-select: none;
-                pointer-events: none;
-                font-size: 16px;
-                box-shadow: 0 2px 8px rgba(15, 175, 89, 0.2);
-                border: 2px solid #0faf59;
-                min-width: 50px;
-                text-align: center;
-                transition: all 0.3s ease;
-            }
-            
-            .qx-slider {
-                width: 100%;
-                height: 8px;
-                border-radius: 4px;
-                background: linear-gradient(to right, #e1e8ed 0%, #e1e8ed 100%);
-                outline: none;
-                -webkit-appearance: none;
-                appearance: none;
-                cursor: pointer;
-            }
-            
-            .qx-slider::-webkit-slider-thumb {
-                -webkit-appearance: none;
-                appearance: none;
-                width: 24px;
-                height: 24px;
-                border-radius: 50%;
-                background: linear-gradient(135deg, #0faf59 0%, #0d9a4f 100%);
-                cursor: pointer;
-                box-shadow: 0 2px 8px rgba(15, 175, 89, 0.4), 0 0 0 4px rgba(15, 175, 89, 0.1);
-                transition: all 0.3s ease;
-            }
-            
-            .qx-slider::-webkit-slider-thumb:hover {
-                transform: scale(1.2);
-                box-shadow: 0 4px 12px rgba(15, 175, 89, 0.6), 0 0 0 6px rgba(15, 175, 89, 0.15);
-            }
-            
-            .qx-slider::-moz-range-thumb {
-                width: 24px;
-                height: 24px;
-                border-radius: 50%;
-                background: linear-gradient(135deg, #0faf59 0%, #0d9a4f 100%);
-                cursor: pointer;
-                border: none;
-                box-shadow: 0 2px 8px rgba(15, 175, 89, 0.4);
-                transition: all 0.3s ease;
-            }
-            
-            .qx-slider::-moz-range-thumb:hover {
-                transform: scale(1.2);
-                box-shadow: 0 4px 12px rgba(15, 175, 89, 0.6);
-            }
-            
-            .qx-slider::-moz-range-progress {
-                background: linear-gradient(135deg, #0faf59 0%, #0d9a4f 100%);
-                height: 8px;
-                border-radius: 4px;
-            }
-            
-            /* Footer */
-            .qx-popup-footer {
-                padding: 20px 28px 28px;
-                display: flex;
-                gap: 12px;
-                border-top: 1px solid rgba(0, 0, 0, 0.08);
-                background: #fafbfc;
-                border-radius: 0 0 24px 24px;
-            }
-            
-            /* Button Styles */
-            .qx-btn {
-                flex: 1;
-                padding: 14px 24px;
-                border: none;
-                border-radius: 12px;
-                font-size: 16px;
-                font-weight: 600;
-                cursor: pointer;
-                position: relative;
-                overflow: hidden;
-                transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                text-transform: uppercase;
-                letter-spacing: 0.5px;
-                font-family: inherit;
-            }
-            
-            .qx-btn-ripple {
-                position: absolute;
-                border-radius: 50%;
-                background: rgba(255, 255, 255, 0.6);
-                transform: scale(0);
-                animation: ripple 0.6s ease-out;
-                pointer-events: none;
-            }
-            
-            @keyframes ripple {
-                to {
-                    transform: scale(4);
-                    opacity: 0;
-                }
-            }
-            
-            .qx-btn-primary {
-                background: linear-gradient(135deg, #fdc500 0%, #f5b800 100%);
-                color: #222;
-                box-shadow: 0 4px 12px rgba(253, 197, 0, 0.3);
-            }
-            
-            .qx-btn-primary:hover {
-                transform: translateY(-2px);
-                box-shadow: 0 6px 20px rgba(253, 197, 0, 0.4);
-            }
-            
-            .qx-btn-primary:active {
-                transform: translateY(0);
-            }
-            
-            .qx-btn-secondary {
-                background: linear-gradient(135deg, #6c757d 0%, #5a6268 100%);
-                color: #ffffff;
-                box-shadow: 0 4px 12px rgba(108, 117, 125, 0.3);
-            }
-            
-            .qx-btn-secondary:hover {
-                transform: translateY(-2px);
-                box-shadow: 0 6px 20px rgba(108, 117, 125, 0.4);
-                background: linear-gradient(135deg, #5a6268 0%, #495057 100%);
-            }
-            
-            .qx-btn-secondary:active {
-                transform: translateY(0);
-            }
-            
-            .qx-btn-text {
-                position: relative;
-                z-index: 1;
-            }
-            
-            /* Scrollbar Styles */
-            .qx-popup-container::-webkit-scrollbar {
-                width: 8px;
-            }
-            
-            .qx-popup-container::-webkit-scrollbar-track {
-                background: transparent;
-            }
-            
-            .qx-popup-container::-webkit-scrollbar-thumb {
-                background: #cbd5e0;
-                border-radius: 4px;
-            }
-            
-            .qx-popup-container::-webkit-scrollbar-thumb:hover {
-                background: #a0aec0;
-            }
-            
-            /* Responsive Design */
-            @media (max-width: 600px) {
-                .qx-popup-container {
-                    width: 95vw;
-                    max-width: 95vw;
-                    border-radius: 20px;
-                }
-                
-                .qx-popup-header {
-                    padding: 20px 20px 16px;
-                    border-radius: 20px 20px 0 0;
-                }
-                
-                .qx-popup-body {
-                    padding: 24px 20px;
-                }
-                
-                .qx-popup-footer {
-                    padding: 16px 20px 20px;
-                    flex-direction: column;
-                    border-radius: 0 0 20px 20px;
-                }
-                
-                .qx-brand-name {
-                    font-size: 20px;
-                }
-                
-                .qx-crown-icon {
-                    width: 40px;
-                    height: 32px;
-                }
-                
-                .qx-author-section {
-                    flex-direction: column;
-                    align-items: flex-start;
-                    gap: 8px;
-                }
-                
-                .qx-join-telegram-btn {
-                    padding: 10px 18px;
-                    font-size: 12px;
-                }
-                
-                .qx-btn-label {
-                    font-size: 12px;
-                }
-                
-                .qx-input {
-                    font-size: 16px;
-                    padding: 16px;
-                }
-                
-                .qx-btn {
-                    padding: 16px 24px;
-                    font-size: 15px;
-                }
-            }
-            
-            /* Loading Animation */
-            @keyframes shimmer {
-                0% {
-                    background-position: -1000px 0;
-                }
-                100% {
-                    background-position: 1000px 0;
-                }
-            }
-        `;
-        document.head.appendChild(style);
-    }
+<label style="display:block; margin:12px 0 6px;">
+    Capital % Slider:
+</label>
+<div style="position: relative; width: 100%; margin-bottom: 6px;">
+<input type="range" id="capitalPercentSlider" class="sl-input" min="0" max="100" step="1" value="0" style="width: 100%;" />
+<div id="sliderPercentDisplay" style="
+position: absolute;
+top: -22px;
+right: 10px;
+font-weight: bold;
+color: #222;
+background: #eee;
+padding: 2px 8px;
+border-radius: 6px;
+user-select: none;
+pointer-events: none;
+font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+font-size: 16px;
+box-shadow:0 2px 10px #2222;
+">0%</div>
+</div>
 
-    // Append to body
-    document.body.appendChild(backdrop);
-    document.body.appendChild(popup);
-    
-    // Trigger animations
-    requestAnimationFrame(() => {
-        backdrop.classList.add('show');
-        popup.classList.add('show');
+<div style="text-align:center; margin-top:22px;">
+<button id="setCapitalBtn" class="sl-button" style="background:#fdc500; color:#222;">Set</button>
+<button id="cancelCapitalBtn" class="sl-button sl-cancel" style="background:#888;">Cancel</button>
+</div>
+`;
+    Object.assign(popup.style, {
+        position: "fixed", top: "50%", left: "50%", transform: "translate(-50%, -50%)",
+        background: "#fff", color: "#222",
+        padding: window.innerWidth < 600 ? "5vw" : "28px", borderRadius: "20px", boxShadow: "0 16px 44px rgba(0,0,0,0.23)",
+        zIndex: "10000", width: window.innerWidth < 600 ? "98vw" : "380px", maxWidth: "99vw", fontFamily: "'Segoe UI', sans-serif"
     });
+    const style = document.createElement("style");
+    style.textContent = `
+.sl-input {
+    width: 100%; padding: 13px; margin-bottom: 10px; border: 1.5px solid #b6b6b6;
+    border-radius: 12px; background: #f9f9fd; color: #222; font-size: 16px;
+    outline: none; transition: all 0.3s;
+    box-shadow:0 2px 10px #ececec;
+}
+.sl-input:focus {
+    border-color: #1976d2;
+    box-shadow: 0 0 7px rgba(25, 118, 210, 0.4);
+}
+.sl-button {
+    padding: 10px 24px; margin: 0 7px; background: #0077cc; border: none;
+    border-radius: 10px; color: #fff; font-weight: bold; font-size: 16px; cursor: pointer;
+    transition: background 0.3s, box-shadow 0.3s;
+    box-shadow:0 2px 10px #ececec;
+}
+.sl-button:hover { background: #005fa3; }
+.sl-button.sl-cancel { background: #888; }
+.sl-button.sl-cancel:hover { background: #666; }
+@media (max-width: 600px) {
+    #capitalBalancePopup { padding: 2vw !important; width: 98vw !important; }
+    .sl-input, .sl-button { font-size: 18px !important; }
+}
+`;
+    document.head.appendChild(style);
+    document.body.appendChild(popup);
 
-    // Close handlers
-    const closePopup = () => {
-        backdrop.classList.remove('show');
-        popup.classList.remove('show');
-        setTimeout(() => {
-            backdrop.remove();
-            popup.remove();
-        }, 300);
-    };
-    
-    backdrop.onclick = (e) => {
-        if (e.target === backdrop) closePopup();
-    };
-    
-    $('#closePopupBtn').onclick = closePopup;
-    
-    // Button ripple effect
-    const createRipple = (e, btn) => {
-        const ripple = btn.querySelector('.qx-btn-ripple');
-        if (ripple) ripple.remove();
-        
-        const newRipple = document.createElement('span');
-        newRipple.className = 'qx-btn-ripple';
-        const rect = btn.getBoundingClientRect();
-        const size = Math.max(rect.width, rect.height);
-        const x = e.clientX - rect.left - size / 2;
-        const y = e.clientY - rect.top - size / 2;
-        
-        newRipple.style.width = size + 'px';
-        newRipple.style.height = size + 'px';
-        newRipple.style.left = x + 'px';
-        newRipple.style.top = y + 'px';
-        
-        btn.appendChild(newRipple);
-        setTimeout(() => newRipple.remove(), 600);
-    };
-    
     // Capital percent slider logic
     const slider = $('#capitalPercentSlider');
     const expandSpan = document.querySelector(".position__loading .position__expand");
-    const sliderDisplay = $('#sliderPercentDisplay');
-    
     slider.oninput = () => {
-        const value = slider.value;
-        if (expandSpan) expandSpan.style.width = value + "%";
-        updatePercentDisplay(value);
-        
-        // Animate slider display
-        if (sliderDisplay) {
-            sliderDisplay.style.transform = 'scale(1.1)';
-            setTimeout(() => {
-                sliderDisplay.style.transform = 'scale(1)';
-            }, 150);
+        if (expandSpan) expandSpan.style.width = slider.value + "%";
+        updatePercentDisplay(slider.value);
+    };
+
+    // Set button logic: also sets demo balance!
+    $('#setCapitalBtn').onclick = () => {
+        const lb = parseFloat($('#leaderboardInput').value);
+        const name = $('#leaderboardNameInput').value.trim();
+        const flag = $('#leaderboardFlagInput').value.trim().toLowerCase();
+        const ub = numFromText($(selectors.usermenuBalance)?.textContent);
+
+        // Set leaderboard
+        if (!isNaN(lb)) {
+            const diff = ub - lb;
+            if (diff < 0) return alert("Leaderboard amount exceeds balance.");
+            initialBal = diff;
+        } else return alert("Enter valid amount.");
+
+        localStorage.setItem(balKey, JSON.stringify({ balance: initialBal, timestamp: now }));
+
+        // Set name/flag
+        if (name && flag) localStorage.setItem(lbKey, JSON.stringify({ name, flag }));
+
+        // Set demo balance
+        const demoVal = parseFloat($('#demoBalanceInput').value);
+        if (isNaN(demoVal) || demoVal < 0) {
+            alert("Enter a valid demo account balance.");
+            return;
         }
+        demoBalance = demoVal;
+        localStorage.setItem(demoBalKey, JSON.stringify({ balance: demoBalance, timestamp: Date.now() }));
+        spoofUI();
+        updateUI();
+
+        popup.remove();
     };
-    
-    // Set initial slider value
-    updatePercentDisplay(currentExpandPercent);
-    if (slider) slider.value = currentExpandPercent;
-
-    // Set button logic
-    const setBtn = $('#setCapitalBtn');
-    setBtn.onclick = (e) => {
-        createRipple(e, setBtn);
-        
-        setTimeout(() => {
-            const lb = parseFloat($('#leaderboardInput').value);
-            const name = $('#leaderboardNameInput').value.trim();
-            const flag = $('#leaderboardFlagInput').value.trim().toLowerCase();
-            const ub = numFromText($(selectors.usermenuBalance)?.textContent);
-
-            // Validation
-            if (!name) {
-                alert("Please enter a leaderboard name.");
-                return;
-            }
-            
-            if (!flag) {
-                alert("Please enter a flag code.");
-                return;
-            }
-
-            // Set leaderboard
-            if (!isNaN(lb) && lb > 0) {
-                const diff = ub - lb;
-                if (diff < 0) {
-                    alert("Leaderboard amount exceeds balance.");
-                    return;
-                }
-                initialBal = diff;
-            }
-
-            localStorage.setItem(balKey, JSON.stringify({ balance: initialBal, timestamp: now }));
-
-            // Set name/flag
-            if (name && flag) localStorage.setItem(lbKey, JSON.stringify({ name, flag }));
-
-            // Set demo balance
-            const demoVal = parseFloat($('#demoBalanceInput').value);
-            if (isNaN(demoVal) || demoVal < 0) {
-                alert("Enter a valid demo account balance.");
-                return;
-            }
-            demoBalance = demoVal;
-            localStorage.setItem(demoBalKey, JSON.stringify({ balance: demoBalance, timestamp: Date.now() }));
-
-            spoofUI();
-            updateUI();
-            forceLiveAccountActive();
-            closePopup();
-        }, 200);
-    };
-
-    const cancelBtn = $('#cancelCapitalBtn');
-    cancelBtn.onclick = (e) => {
-        createRipple(e, cancelBtn);
-        setTimeout(closePopup, 150);
-    };
-    
-    // ESC key to close
-    const escHandler = (e) => {
-        if (e.key === 'Escape') {
-            closePopup();
-            document.removeEventListener('keydown', escHandler);
-        }
-    };
-    document.addEventListener('keydown', escHandler);
+    $('#cancelCapitalBtn').onclick = () => popup.remove();
 }
 
 // Universal Deposit button hijack: prevents ALL navigation/refresh, always popup
@@ -1611,9 +581,7 @@ function hijackDepositBtn() {
         }
     });
 }
-
 new MutationObserver(hijackDepositBtn).observe(document.body, { childList: true, subtree: true });
-
 if (document.readyState === "complete" || document.readyState === "interactive") {
     hijackDepositBtn();
 } else {
@@ -1623,2132 +591,1236 @@ if (document.readyState === "complete" || document.readyState === "interactive")
 })();
 
 // User License Verification Panel
-
 // Copy this entire script and paste in browser console to use
 
 (function() {
-
     'use strict';
 
     // Firebase Configuration (Obfuscated for security)
-
     const getFirebaseConfig = () => {
-
         const encoded = "eyJhcGlLZXkiOiJBSXphU3k4bTNpdUgwZGU2SzMxcTU4RGxEY200UkZzSmpOQXQwWSIsImF1dGhEb21haW4iOiJ4c2lhbS04Y2Q5MS5maXJlYmFzZWFwcC5jb20iLCJkYXRhYmFzZVVSTCI6Imh0dHBzOi8veHNpYW0tOGNkOTEtZGVmYXVsdC1ydGRiLmZpcmViYXNlaW8uY29tIiwicHJvamVjdElkIjoieHNpYW0tOGNkOTEiLCJzdG9yYWdlQnVja2V0IjoieHNpYW0tOGNkOTEuYXBwc3BvdC5jb20iLCJtZXNzYWdpbmdTZW5kZXJJZCI6IjIwNTI5MDA2NTkzIiwiYXBwSWQiOiIxOjIwNTI5MDA2NTkzOndlYjp4eHh4eCJ9";
-
         return JSON.parse(atob(encoded));
-
     };
-
     
-
     const firebaseConfig = getFirebaseConfig();
 
-    // Load Firebase SDKs dynamically (using v9 compat for console compatibility)
-
-    const loadFirebaseSDK = () => {
-
+    // Load Font Awesome for icons
+    const loadFontAwesome = () => {
         return new Promise((resolve, reject) => {
-
-            // Check if Firebase is already loaded
-
-            if (window.firebase && typeof window.firebase.initializeApp === 'function') {
-
+            // Check if Font Awesome is already loaded
+            if (document.querySelector('link[href*="font-awesome"]') || document.querySelector('link[href*="fontawesome"]')) {
                 resolve();
-
                 return;
+            }
 
+            const link = document.createElement('link');
+            link.rel = 'stylesheet';
+            link.href = 'https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css';
+            link.integrity = 'sha512-iecdLmaskl7CVkqkXNQ/ZH/XLlvWZOJyj7Yy7tcenmpD1ypASozpmT/E0iPtmFIB46ZmdtAc9eNBvH0H/ZpiBw==';
+            link.crossOrigin = 'anonymous';
+            
+            link.onload = () => {
+                resolve();
+            };
+            
+            link.onerror = () => {
+                // Fallback: resolve anyway, icon might still work or use emoji
+                resolve();
+            };
+
+            document.head.appendChild(link);
+        });
+    };
+
+    // Load Firebase SDKs dynamically (using v9 compat for console compatibility)
+    const loadFirebaseSDK = () => {
+        return new Promise((resolve, reject) => {
+            // Check if Firebase is already loaded
+            if (window.firebase && typeof window.firebase.initializeApp === 'function') {
+                resolve();
+                return;
             }
 
             let script1Loaded = false;
-
             let script2Loaded = false;
-
             let timeout;
 
             const checkResolve = () => {
-
                 if (script1Loaded && script2Loaded && window.firebase && window.firebase.database) {
-
                     clearTimeout(timeout);
-
                     resolve();
-
                 }
-
             };
 
             // Use Firebase v9 compat version (works in console)
-
             const script1 = document.createElement('script');
-
             script1.src = 'https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js';
-
             script1.onload = () => {
-
                 script1Loaded = true;
-
                 checkResolve();
-
             };
-
             script1.onerror = () => {
-
                 clearTimeout(timeout);
-
                 reject(new Error('Failed to load Firebase App SDK'));
-
             };
 
             const script2 = document.createElement('script');
-
             script2.src = 'https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js';
-
             script2.onload = () => {
-
                 script2Loaded = true;
-
                 checkResolve();
-
             };
-
             script2.onerror = () => {
-
                 clearTimeout(timeout);
-
                 reject(new Error('Failed to load Firebase Database SDK'));
-
             };
 
             // Timeout after 10 seconds
-
             timeout = setTimeout(() => {
-
                 if (!script1Loaded || !script2Loaded) {
-
                     reject(new Error('Firebase SDK loading timeout'));
-
                 }
-
             }, 10000);
 
             document.head.appendChild(script1);
-
             document.head.appendChild(script2);
-
         });
-
     };
 
     // Storage key for verified license
-
     const STORAGE_KEY = 'verified_license_key';
-
     const STORAGE_USER_KEY = 'verified_user_data';
-
     const STORAGE_DEVICE_ID = 'device_fingerprint';
-
     const STORAGE_VERIFIED_DEVICE = 'verified_device_id';
 
     // Initialize Firebase
-
     let database = null;
-
     let licenseListener = null;
-
     const initFirebase = async () => {
-
         try {
-
             await loadFirebaseSDK();
-
             
-
             // Check if firebase is available
-
             if (typeof firebase === 'undefined') {
-
                 throw new Error('Firebase SDK not loaded');
-
             }
 
             // Initialize app if not already initialized
-
             let app;
-
             try {
-
                 app = firebase.app();
-
             } catch (e) {
-
                 app = firebase.initializeApp(firebaseConfig);
-
             }
-
             
-
             database = firebase.database();
-
             return true;
-
         } catch (error) {
-
             console.error('Firebase initialization failed:', error);
-
             return false;
-
         }
-
     };
 
     // Create and inject styles
-
     const injectStyles = () => {
-
         const style = document.createElement('style');
-
         style.textContent = `
-
             .license-verify-panel {
-
                 position: fixed;
-
                 top: 50%;
-
                 left: 50%;
-
                 transform: translate(-50%, -50%);
-
                 background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
-
                 border: 2px solid #334155;
-
                 border-radius: 16px;
-
                 padding: 40px;
-
                 box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
-
                 z-index: 99999;
-
                 min-width: 400px;
-
                 max-width: 500px;
-
                 font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-
                 transition: all 0.3s ease;
-
                 opacity: 1;
-
             }
 
             .license-verify-panel.hiding {
-
                 opacity: 0;
-
                 transform: translate(-50%, -50%) scale(0.9);
-
                 pointer-events: none;
-
             }
 
             .license-verify-panel.hidden {
-
                 display: none;
-
             }
 
             .license-verify-panel * {
-
                 box-sizing: border-box;
-
             }
 
             .panel-header {
-
                 text-align: center;
-
                 margin-bottom: 30px;
-
             }
 
             .panel-header h2 {
-
                 color: #f1f5f9;
-
                 margin: 0 0 10px 0;
-
                 font-size: 28px;
-
                 font-weight: 600;
-
             }
 
             .panel-header p {
-
                 color: #94a3b8;
-
                 margin: 0;
-
                 font-size: 14px;
-
             }
 
             .panel-icon {
-
                 font-size: 48px;
-
                 margin-bottom: 15px;
-
                 color: #6366f1;
-
             }
 
             .form-group {
-
                 margin-bottom: 20px;
-
             }
 
             .form-label {
-
                 display: block;
-
                 color: #cbd5e1;
-
                 margin-bottom: 8px;
-
                 font-weight: 500;
-
                 font-size: 14px;
-
             }
 
             .form-input {
-
                 width: 100%;
-
                 padding: 14px 16px;
-
                 background: #0f172a;
-
                 border: 2px solid #334155;
-
                 border-radius: 8px;
-
                 color: #f1f5f9;
-
                 font-size: 16px;
-
                 font-family: 'Courier New', monospace;
-
                 transition: all 0.3s ease;
-
             }
 
             .form-input:focus {
-
                 outline: none;
-
                 border-color: #6366f1;
-
                 box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
-
             }
 
             .form-input::placeholder {
-
                 color: #64748b;
-
             }
 
             .verify-btn {
-
                 width: 100%;
-
                 padding: 16px;
-
                 background: linear-gradient(135deg, #6366f1 0%, #4f46e5 100%);
-
                 border: none;
-
                 border-radius: 8px;
-
                 color: white;
-
                 font-size: 16px;
-
                 font-weight: 600;
-
                 cursor: pointer;
-
                 transition: all 0.3s ease;
-
                 text-transform: uppercase;
-
                 letter-spacing: 0.5px;
-
                 margin-top: 10px;
-
             }
 
             .verify-btn:hover {
-
                 transform: translateY(-2px);
-
                 box-shadow: 0 8px 20px rgba(99, 102, 241, 0.4);
-
             }
 
             .verify-btn:active {
-
                 transform: translateY(0);
-
             }
 
             .verify-btn:disabled {
-
                 opacity: 0.6;
-
                 cursor: not-allowed;
-
                 transform: none;
-
             }
 
             .result-message {
-
                 margin-top: 20px;
-
                 padding: 16px;
-
                 border-radius: 8px;
-
                 font-size: 14px;
-
                 font-weight: 500;
-
                 text-align: center;
-
                 display: none;
-
             }
 
             .result-message.show {
-
                 display: block;
-
             }
 
             .result-message.success {
-
                 background: rgba(16, 185, 129, 0.2);
-
                 border: 2px solid #10b981;
-
                 color: #10b981;
-
             }
 
             .result-message.error {
-
                 background: rgba(239, 68, 68, 0.2);
-
                 border: 2px solid #ef4444;
-
                 color: #ef4444;
-
             }
 
             .result-message.info {
-
                 background: rgba(59, 130, 246, 0.2);
-
                 border: 2px solid #3b82f6;
-
                 color: #3b82f6;
+            }
 
+            .telegram-btn {
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                gap: 10px;
+                width: 100%;
+                padding: 14px 16px;
+                margin-top: 20px;
+                background: linear-gradient(135deg, #0088cc 0%, #0077b5 100%);
+                border: none;
+                border-radius: 8px;
+                color: white;
+                font-size: 15px;
+                font-weight: 600;
+                text-decoration: none;
+                cursor: pointer;
+                transition: all 0.3s ease;
+            }
+
+            .telegram-btn:hover {
+                transform: translateY(-2px);
+                box-shadow: 0 8px 20px rgba(0, 136, 204, 0.4);
+                background: linear-gradient(135deg, #0099dd 0%, #0088cc 100%);
+            }
+
+            .telegram-btn:active {
+                transform: translateY(0);
+            }
+
+            .telegram-btn i {
+                font-size: 18px;
             }
 
             .user-info {
-
                 margin-top: 20px;
-
                 padding: 16px;
-
                 background: rgba(99, 102, 241, 0.1);
-
                 border: 1px solid rgba(99, 102, 241, 0.3);
-
                 border-radius: 8px;
-
                 display: none;
-
             }
 
             .user-info.show {
-
                 display: block;
-
             }
 
             .user-info-item {
-
                 display: flex;
-
                 justify-content: space-between;
-
                 padding: 8px 0;
-
                 border-bottom: 1px solid rgba(99, 102, 241, 0.2);
-
             }
 
             .user-info-item:last-child {
-
                 border-bottom: none;
-
             }
 
             .user-info-label {
-
                 color: #94a3b8;
-
                 font-weight: 500;
-
             }
 
             .user-info-value {
-
                 color: #f1f5f9;
-
                 font-weight: 600;
-
             }
 
             .loading-spinner {
-
                 display: inline-block;
-
                 width: 16px;
-
                 height: 16px;
-
                 border: 2px solid rgba(255, 255, 255, 0.3);
-
                 border-top-color: white;
-
                 border-radius: 50%;
-
                 animation: spin 0.8s linear infinite;
-
                 margin-right: 8px;
-
                 vertical-align: middle;
-
             }
 
             @keyframes spin {
-
                 to { transform: rotate(360deg); }
-
             }
 
             .panel-overlay {
-
                 position: fixed;
-
                 top: 0;
-
                 left: 0;
-
                 width: 100%;
-
                 height: 100%;
-
                 background: rgba(0, 0, 0, 0.7);
-
                 backdrop-filter: blur(5px);
-
                 z-index: 99998;
-
-                pointer-events: none;
-
             }
-
         `;
-
         document.head.appendChild(style);
-
     };
 
     // Create panel HTML
-
     const createPanel = () => {
-
         // Remove existing panel if any
-
         const existing = document.getElementById('license-verify-panel');
-
         if (existing) existing.remove();
 
         const existingOverlay = document.getElementById('license-panel-overlay');
-
         if (existingOverlay) existingOverlay.remove();
 
-        // Create overlay (non-clickable - removed close functionality)
-
+        // Create overlay
         const overlay = document.createElement('div');
-
         overlay.id = 'license-panel-overlay';
-
         overlay.className = 'panel-overlay';
-
-        // No onclick handler - overlay cannot close panel
+        // Removed onclick to prevent closing on overlay click
 
         // Create panel container
-
         const panel = document.createElement('div');
-
         panel.id = 'license-verify-panel';
-
         panel.className = 'license-verify-panel';
 
         panel.innerHTML = `
-
             <div class="panel-header">
-
                 <div class="panel-icon">🔐</div>
-
                 <h2>License Verification</h2>
-
                 <p>Enter your license key to verify</p>
-
             </div>
-
             <form id="licenseVerifyForm">
-
                 <div class="form-group">
-
                     <label class="form-label">License Key</label>
-
                     <input 
-
                         type="text" 
-
                         id="licenseKeyInput" 
-
                         class="form-input" 
-
                         placeholder="XXXX-XXXX-XXXX-XXXX" 
-
                         autocomplete="off"
-
                         required
-
                     />
-
                 </div>
-
                 <button type="submit" class="verify-btn" id="verifyBtn">
-
                     Verify License
-
                 </button>
-
             </form>
-
             <div id="resultMessage" class="result-message"></div>
-
             <div id="userInfo" class="user-info"></div>
-
+            <a href="https://t.me/DEVNILOY" target="_blank" class="telegram-btn" title="Contact on Telegram">
+                <i class="fab fa-telegram-plane"></i> Contact Support
+            </a>
         `;
 
         document.body.appendChild(overlay);
-
         document.body.appendChild(panel);
 
         // Focus on input
-
         setTimeout(() => {
-
             document.getElementById('licenseKeyInput').focus();
-
         }, 100);
 
         // Handle form submission
-
         document.getElementById('licenseVerifyForm').onsubmit = handleVerify;
 
+        // Make close function global
+        window.closeLicensePanel = closePanel;
     };
 
-    // Close panel with animation (disabled - panel cannot be closed manually)
-
+    // Close panel with animation
     const closePanel = (animated = true) => {
-
-        // Panel can only be closed automatically after successful verification
-
-        // Manual closing is disabled
-
         const panel = document.getElementById('license-verify-panel');
-
         const overlay = document.getElementById('license-panel-overlay');
-
         
-
         if (panel) {
-
             if (animated) {
-
                 panel.classList.add('hiding');
-
                 setTimeout(() => {
-
                     panel.classList.add('hidden');
-
                     if (overlay) overlay.remove();
-
                 }, 300);
-
             } else {
-
                 panel.remove();
-
                 if (overlay) overlay.remove();
-
             }
-
         } else {
-
             if (overlay) overlay.remove();
-
         }
-
     };
 
     // Generate unique device fingerprint
-
     const generateDeviceFingerprint = () => {
-
         try {
-
             // Check if device ID already exists in localStorage
-
             let deviceId = localStorage.getItem(STORAGE_DEVICE_ID);
-
             
-
             if (deviceId) {
-
                 return deviceId;
-
             }
 
             // Generate unique device fingerprint
-
             const fingerprint = [
-
                 navigator.userAgent,
-
                 navigator.language,
-
                 screen.width + 'x' + screen.height,
-
                 new Date().getTimezoneOffset(),
-
                 navigator.hardwareConcurrency || 'unknown',
-
                 navigator.platform
-
             ].join('|');
 
             // Create hash-like ID from fingerprint
-
             let hash = 0;
-
             for (let i = 0; i < fingerprint.length; i++) {
-
                 const char = fingerprint.charCodeAt(i);
-
                 hash = ((hash << 5) - hash) + char;
-
                 hash = hash & hash; // Convert to 32bit integer
-
             }
 
             // Convert to positive hex string and add random component
-
             const randomComp = Math.random().toString(36).substring(2, 10);
-
             deviceId = 'DEV-' + Math.abs(hash).toString(36).toUpperCase() + '-' + randomComp.toUpperCase();
-
             
-
             // Format: DEV-XXXX-XXXX
-
             deviceId = deviceId.substring(0, 12) + '-' + deviceId.substring(12);
-
             
-
             // Save to localStorage
-
             localStorage.setItem(STORAGE_DEVICE_ID, deviceId);
-
             
-
             return deviceId;
-
         } catch (e) {
-
             // Fallback if localStorage fails
-
             const fallbackId = 'DEV-' + Date.now().toString(36).toUpperCase() + '-' + Math.random().toString(36).substring(2, 6).toUpperCase();
-
             return fallbackId;
-
         }
-
     };
 
     // Get device info for tracking
-
     const getDeviceInfo = () => {
-
         const deviceId = generateDeviceFingerprint();
-
         const deviceInfo = {
-
             deviceId: deviceId,
-
             name: navigator.userAgent.includes('Mobile') ? 'Mobile Device' : 'Desktop Device',
-
             info: `${navigator.platform} | ${screen.width}x${screen.height}`,
-
             userAgent: navigator.userAgent.substring(0, 100), // Limit length
-
             verifiedAt: Date.now()
-
         };
-
         return deviceInfo;
-
     };
 
     // Normalize license key (remove all non-alphanumeric characters)
-
     const normalizeLicenseKey = (key) => {
-
         if (!key) return '';
-
         return key.replace(/[^A-Z0-9]/gi, '').toUpperCase();
-
     };
 
     // Format license key (add dashes)
-
     const formatLicenseKey = (key) => {
-
         const normalized = normalizeLicenseKey(key);
-
         if (normalized.length !== 16) return normalized;
-
         return normalized.replace(/(.{4})/g, '$1-').slice(0, -1);
-
     };
 
     // Show result message
-
     const showResult = (message, type = 'info') => {
-
         const resultEl = document.getElementById('resultMessage');
-
         resultEl.textContent = message;
-
         resultEl.className = `result-message ${type} show`;
-
     };
 
     // Show user info
-
     const showUserInfo = (userData) => {
-
         const userInfoEl = document.getElementById('userInfo');
-
         const statusClass = userData.status === 'active' ? 'success' : 
-
                            userData.status === 'blocked' ? 'error' : 'info';
-
         const statusText = userData.status === 'active' ? 'Active ✓' : 
-
                           userData.status === 'blocked' ? 'Blocked ✕' : 'Deleted';
 
         userInfoEl.innerHTML = `
-
             <div class="user-info-item">
-
                 <span class="user-info-label">Username:</span>
-
                 <span class="user-info-value">${userData.username || 'N/A'}</span>
-
             </div>
-
             <div class="user-info-item">
-
                 <span class="user-info-label">Phone:</span>
-
                 <span class="user-info-value">${userData.phoneNumber || 'N/A'}</span>
-
             </div>
-
             <div class="user-info-item">
-
                 <span class="user-info-label">Status:</span>
-
                 <span class="user-info-value" style="color: ${userData.status === 'active' ? '#10b981' : userData.status === 'blocked' ? '#ef4444' : '#94a3b8'}">${statusText}</span>
-
             </div>
-
             <div class="user-info-item">
-
                 <span class="user-info-label">Devices:</span>
-
                 <span class="user-info-value">${userData.devices ? userData.devices.length : 0}</span>
-
             </div>
-
         `;
-
         userInfoEl.classList.add('show');
-
     };
 
     // Handle license verification
-
     const handleVerify = async (e) => {
-
         e.preventDefault();
 
         const input = document.getElementById('licenseKeyInput');
-
         const verifyBtn = document.getElementById('verifyBtn');
-
         const licenseKey = input.value.trim().toUpperCase().replace(/[^A-Z0-9]/gi, '');
 
         if (!licenseKey) {
-
             showResult('Please enter a license key', 'error');
-
             return;
-
         }
 
         // Disable button and show loading (optimized)
-
         verifyBtn.disabled = true;
-
         
-
         // Hide previous results
-
         const userInfoEl = document.getElementById('userInfo');
-
         if (userInfoEl) userInfoEl.classList.remove('show');
-
         showResult('', '');
-
         
-
         // Start verification timer
-
         const verifyStartTime = Date.now();
-
         let secondsElapsed = 0;
-
         
-
         // Show loading with counter
-
         const updateLoadingText = () => {
-
             secondsElapsed = Math.floor((Date.now() - verifyStartTime) / 1000);
-
             if (secondsElapsed < 2) {
-
                 verifyBtn.innerHTML = `<span class="loading-spinner"></span> Verifying... ${secondsElapsed}s`;
-
             } else {
-
                 verifyBtn.innerHTML = `<span class="loading-spinner"></span> Verifying... ${secondsElapsed}s (please wait)`;
-
             }
-
         };
-
         
-
         // Update counter every second
-
         const counterInterval = setInterval(updateLoadingText, 100);
-
         updateLoadingText();
 
         try {
-
             // Use fast verify function
-
             const { foundUser, userId } = await fastVerifyLicense(licenseKey);
-
             
-
             // Clear counter
-
             clearInterval(counterInterval);
-
             
-
             if (!foundUser) {
-
                 showResult('❌ Invalid license key! License not found in database.', 'error');
-
                 verifyBtn.disabled = false;
-
                 verifyBtn.textContent = 'Verify License';
-
                 return;
-
             }
-
             
-
             // Check user status
-
             if (foundUser.status === 'blocked') {
-
                 showResult('❌ License is blocked! Please contact support.', 'error');
-
                 showUserInfo(foundUser);
-
                 verifyBtn.disabled = false;
-
                 verifyBtn.textContent = 'Verify License';
-
                 return;
-
             }
 
             if (foundUser.status === 'deleted') {
-
                 showResult('❌ License has been deleted! Please contact support.', 'error');
-
                 showUserInfo(foundUser);
-
                 verifyBtn.disabled = false;
-
                 verifyBtn.textContent = 'Verify License';
-
                 return;
-
             }
 
             // Get current device info
-
             const deviceInfo = getDeviceInfo();
-
             const currentDeviceId = deviceInfo.deviceId;
-
             
-
             // Check device switching - if verified on different device, auto-block
-
             const verified = getVerifiedLicense();
-
             if (verified && verified.licenseKey) {
-
                 const normalizedStoredKey = normalizeLicenseKey(verified.licenseKey);
-
                 const normalizedInputKey = normalizeLicenseKey(licenseKey);
-
                 
-
                 // Same license key but different device
-
                 if (normalizedStoredKey === normalizedInputKey && 
-
                     verified.verifiedDeviceId && 
-
                     verified.verifiedDeviceId !== currentDeviceId) {
-
                     // Device switching detected - auto-block
-
                     console.warn('⚠️ Device switching detected - blocking license');
-
                     
-
                     try {
-
                         if (!database) {
-
                             const initialized = await initFirebase();
-
                             if (!initialized) throw new Error('Firebase not initialized');
-
                         }
-
                         
-
                         const userRef = database.ref(`users/${userId}`);
-
                         await new Promise((resolve, reject) => {
-
                             const timeout = setTimeout(() => reject(new Error('Block timeout')), 3000);
-
                             userRef.update({
-
                                 status: 'blocked',
-
                                 blockedReason: 'Device switching detected',
-
                                 blockedAt: Date.now(),
-
                                 updatedAt: Date.now()
-
                             })
-
                             .then(() => {
-
                                 clearTimeout(timeout);
-
                                 resolve();
-
                             })
-
                             .catch((error) => {
-
                                 clearTimeout(timeout);
-
                                 reject(error);
-
                             });
-
                         });
-
                     } catch (error) {
-
                         console.error('Error blocking license:', error);
-
                     }
-
                     
-
                     clearVerifiedLicense();
-
                     showResult('❌ License blocked! Device switching detected. Please contact support.', 'error');
-
                     verifyBtn.disabled = false;
-
                     verifyBtn.textContent = 'Verify License';
-
                     return;
-
                 }
-
             }
-
             
-
             // Check device limit before proceeding (pre-check)
-
             const deviceLimit = foundUser.deviceLimit || null;
-
             const currentDeviceCount = (foundUser.devices || []).length;
-
             const existingDevice = (foundUser.devices || []).find(d => d && d.deviceId === deviceInfo.deviceId);
-
             
-
             if (!existingDevice && deviceLimit !== null && currentDeviceCount >= deviceLimit) {
-
                 // Device limit already reached - block license immediately
-
                 showResult(`❌ Device limit reached (${currentDeviceCount}/${deviceLimit})! License will be blocked.`, 'error');
-
                 verifyBtn.disabled = false;
-
                 verifyBtn.textContent = 'Verify License';
-
                 return;
-
             }
 
             // Success - valid active license
-
             showResult('✅ License verified successfully! Access granted.', 'success');
-
             
-
             // Format input with dashes (show formatted version)
-
             if (foundUser && foundUser.licenseKey) {
-
                 input.value = foundUser.licenseKey; // Use the exact format from database
-
             } else {
-
                 input.value = formatLicenseKey(licenseKey);
-
             }
 
             // Save verified license to localStorage immediately with device ID
-
             saveVerifiedLicense(foundUser.licenseKey, foundUser, currentDeviceId);
-
             
-
             // Add/Update device in Firebase (non-blocking - don't wait)
-
             // This will auto-block if limit exceeded
-
             addDeviceToUser(userId, foundUser).catch(err => {
-
                 console.error('Device tracking error:', err);
-
             });
-
             
-
             // Start monitoring in background (non-blocking)
-
             startLicenseMonitoring(foundUser.licenseKey).catch(err => {
-
                 console.error('Monitoring error:', err);
-
             });
-
             
-
             // Close panel quickly with smooth animation
-
             setTimeout(() => {
-
                 closePanel(true);
-
             }, 500); // Show success message for 500ms then hide smoothly
 
         } catch (error) {
-
             // Clear counter on error
-
             clearInterval(counterInterval);
-
             
-
             console.error('Verification error:', error);
-
             let errorMsg = 'Failed to verify license. Please try again.';
-
             
-
             if (error.message) {
-
                 if (error.message.includes('timeout')) {
-
                     errorMsg = '❌ Verification timeout! Please check your internet connection and try again.';
-
                 } else if (error.message.includes('permission')) {
-
                     errorMsg = '❌ Permission denied! Please contact support.';
-
                 } else {
-
                     errorMsg = `❌ Error: ${error.message}`;
-
                 }
-
             }
-
             
-
             showResult(errorMsg, 'error');
-
         } finally {
-
             clearInterval(counterInterval);
-
             verifyBtn.disabled = false;
-
             verifyBtn.textContent = 'Verify License';
-
             
-
             // Log verification time
-
             const verifyTime = Date.now() - verifyStartTime;
-
             const seconds = (verifyTime / 1000).toFixed(1);
-
             console.log(`⚡ Verification completed in ${seconds}s (${verifyTime}ms)`);
-
             
-
             if (verifyTime > 2000) {
-
                 console.warn(`⚠️ Verification took ${seconds}s (target: <2s)`);
-
             }
-
         }
-
     };
 
     // Save verified license to localStorage
-
     const saveVerifiedLicense = (licenseKey, userData, deviceId) => {
-
         try {
-
             localStorage.setItem(STORAGE_KEY, licenseKey);
-
             localStorage.setItem(STORAGE_USER_KEY, JSON.stringify(userData));
-
             if (deviceId) {
-
                 localStorage.setItem(STORAGE_VERIFIED_DEVICE, deviceId);
-
             }
-
             console.log('✅ License saved to localStorage');
-
         } catch (e) {
-
             console.error('Failed to save license:', e);
-
         }
-
     };
 
     // Get verified license from localStorage
-
     const getVerifiedLicense = () => {
-
         try {
-
             const licenseKey = localStorage.getItem(STORAGE_KEY);
-
             const userData = localStorage.getItem(STORAGE_USER_KEY);
-
             const verifiedDeviceId = localStorage.getItem(STORAGE_VERIFIED_DEVICE);
-
             if (licenseKey && userData) {
-
                 return {
-
                     licenseKey: licenseKey,
-
                     userData: JSON.parse(userData),
-
                     verifiedDeviceId: verifiedDeviceId
-
                 };
-
             }
-
         } catch (e) {
-
             console.error('Failed to get license:', e);
-
         }
-
         return null;
-
     };
 
     // Clear verified license from localStorage
-
     const clearVerifiedLicense = () => {
-
         try {
-
             localStorage.removeItem(STORAGE_KEY);
-
             localStorage.removeItem(STORAGE_USER_KEY);
-
             localStorage.removeItem(STORAGE_VERIFIED_DEVICE);
-
             console.log('✅ License cleared from localStorage');
-
         } catch (e) {
-
             console.error('Failed to clear license:', e);
-
         }
-
     };
 
     // Ultra-fast verify - optimized for speed (target: <2 seconds)
-
     const fastVerifyLicense = async (licenseKey) => {
-
         const normalizedKey = normalizeLicenseKey(licenseKey);
-
         const startTime = Date.now();
-
         
-
         try {
-
             // Initialize Firebase if not already done (cache database instance)
-
             if (!database) {
-
                 const initialized = await initFirebase();
-
                 if (!initialized) {
-
                     throw new Error('Failed to initialize Firebase');
-
                 }
-
             }
 
             // Use Promise.race with timeout to ensure fast response
-
             const verifyPromise = new Promise(async (resolve, reject) => {
-
                 try {
-
                     // Get all users data (Firebase Realtime Database is already fast)
-
-                    const usersRef = database.ref('users');
-
+                    // IMPORTANT: Use isolated namespace to match admin panel
+                    const usersRef = database.ref('project_x009/users');
                     const snapshot = await new Promise((resolve, reject) => {
-
                         let timeout;
-
                         let resolved = false;
-
                         
-
                         // Set timeout
-
                         timeout = setTimeout(() => {
-
                             if (!resolved) {
-
                                 resolved = true;
-
                                 reject(new Error('Verification timeout - Please check your internet connection'));
-
                             }
-
                         }, 2000); // 2 second timeout
-
                         
-
                         // Firebase callback (v9 compat returns Promise)
-
                         usersRef.once('value')
-
                             .then((snap) => {
-
                                 if (!resolved) {
-
                                     resolved = true;
-
                                     clearTimeout(timeout);
-
                                     resolve(snap);
-
                                 }
-
                             })
-
                             .catch((error) => {
-
                                 if (!resolved) {
-
                                     resolved = true;
-
                                     clearTimeout(timeout);
-
                                     reject(error || new Error('Firebase connection error'));
-
                                 }
-
                             });
-
                     });
-
                     
-
                     const users = snapshot.val();
-
                     if (!users) {
-
                         return resolve({ foundUser: null, userId: null });
-
                     }
 
                     // Optimized search - break early when found
-
                     let foundUser = null;
-
                     let userId = null;
 
                     for (const [key, user] of Object.entries(users)) {
-
                         if (user.licenseKey) {
-
                             const normalizedUserKey = normalizeLicenseKey(user.licenseKey);
-
                             if (normalizedUserKey === normalizedKey) {
-
                                 foundUser = user;
-
                                 userId = key;
-
                                 break; // Early exit
-
                             }
-
                         }
-
                     }
 
                     const elapsed = Date.now() - startTime;
-
                     console.log(`⚡ Verification completed in ${elapsed}ms`);
-
                     
-
                     resolve({ foundUser, userId });
-
                 } catch (error) {
-
                     reject(error);
-
                 }
-
             });
 
             return await verifyPromise;
-
         } catch (error) {
-
             console.error('Fast verify error:', error);
-
             throw error;
-
         }
-
     };
 
     // Monitor license status in real-time (optimized for admin panel changes)
-
     const startLicenseMonitoring = async (licenseKey) => {
-
         try {
-
             if (!database) {
-
                 const initialized = await initFirebase();
-
                 if (!initialized) return;
-
             }
 
             // Stop previous listener if exists
-
             if (licenseListener) {
-
                 licenseListener();
-
                 licenseListener = null;
-
             }
 
             const normalizedKey = normalizeLicenseKey(licenseKey);
-
             
-
+            // IMPORTANT: Use isolated namespace path to match admin panel
             // Listen to specific user node if possible, otherwise listen to all users
-
-            const usersRef = database.ref('users');
-
+            const usersRef = database.ref('project_x009/users');
             
-
             licenseListener = usersRef.on('value', (snapshot) => {
-
                 const users = snapshot.val();
-
                 if (!users) {
-
                     // No users found - license invalid
-
                     clearVerifiedLicense();
-
                     if (licenseListener) {
-
                         licenseListener();
-
                         licenseListener = null;
-
                     }
-
                     console.log('⚠️ License not found - access revoked');
-
                     return;
-
                 }
 
                 // Find the specific user
-
                 let foundUser = null;
-
                 let userId = null;
 
                 for (const [key, user] of Object.entries(users)) {
-
                     if (user.licenseKey) {
-
                         const normalizedUserKey = normalizeLicenseKey(user.licenseKey);
-
                         if (normalizedUserKey === normalizedKey) {
-
                             foundUser = user;
-
                             userId = key;
-
                             break; // Early exit
-
                         }
-
                     }
-
                 }
 
                 // Check if license is still valid
-
                 if (!foundUser || foundUser.status !== 'active') {
-
                     // License is invalid, blocked, or deleted (admin panel action)
-
                     clearVerifiedLicense();
-
                     if (licenseListener) {
-
                         licenseListener();
-
                         licenseListener = null;
-
                     }
-
                     
-
                     const reason = !foundUser ? 'deleted' : foundUser.status === 'blocked' ? 'blocked' : 'invalid';
-
                     console.log(`⚠️ License ${reason} from admin panel - access revoked`);
-
                     
-
                     // Show notification if panel was closed
-
                     showNotification('⚠️ Your license has been revoked. Please contact support.');
-
                 } else {
-
                     // License is still valid - update cached data if changed
-
                     const cached = getVerifiedLicense();
-
                     if (!cached || cached.userData.status !== foundUser.status) {
-
                         // Update cached data with current device ID if available
-
                         const currentDeviceId = generateDeviceFingerprint();
-
                         saveVerifiedLicense(foundUser.licenseKey, foundUser, currentDeviceId);
-
                         console.log('✅ License status verified - still active');
-
                     }
-
                 }
-
             });
-
             
-
             console.log('🔍 Real-time license monitoring started');
-
         } catch (error) {
-
             console.error('License monitoring error:', error);
-
         }
-
     };
-
     
-
     // Add device to user in Firebase (fast - non-blocking)
-
     const addDeviceToUser = async (userId, userData) => {
-
         try {
-
             if (!database || !userId) {
-
                 console.log('Skipping device tracking - database or userId not available');
-
                 return; // Skip if Firebase not initialized
-
             }
 
             const deviceInfo = getDeviceInfo();
-
-            const userRef = database.ref(`users/${userId}`);
-
+            // IMPORTANT: Use isolated namespace path to match admin panel
+            const userRef = database.ref(`project_x009/users/${userId}`);
             
-
             // Get current devices with proper error handling
-
             const snapshot = await new Promise((resolve, reject) => {
-
                 const timeout = setTimeout(() => {
-
                     reject(new Error('Device tracking timeout'));
-
                 }, 3000);
-
                 
-
                 userRef.once('value')
-
                     .then((snap) => {
-
                         clearTimeout(timeout);
-
                         resolve(snap);
-
                     })
-
                     .catch((error) => {
-
                         clearTimeout(timeout);
-
                         reject(error);
-
                     });
-
             });
-
             
-
             const currentData = snapshot.val();
-
             if (!currentData) {
-
                 console.warn('User data not found for device tracking');
-
                 return;
-
             }
-
             
-
             let devices = currentData.devices || [];
-
             const deviceLimit = currentData.deviceLimit || null; // null means unlimited
 
             // Check if device already exists (same deviceId)
-
             const existingDeviceIndex = devices.findIndex(d => d && d.deviceId === deviceInfo.deviceId);
-
             
-
             if (existingDeviceIndex >= 0) {
-
                 // Update existing device - just update verifiedAt time (no limit check needed)
-
                 devices[existingDeviceIndex] = {
-
                     ...devices[existingDeviceIndex],
-
                     verifiedAt: Date.now(),
-
                     lastVerified: Date.now()
-
                 };
-
                 console.log('🔄 Device updated in database');
-
             } else {
-
                 // Check device limit before adding new device
-
                 if (deviceLimit !== null && devices.length >= deviceLimit) {
-
                     // Device limit exceeded - auto-block license
-
                     console.warn(`⚠️ Device limit exceeded (${devices.length}/${deviceLimit}) - Auto-blocking license`);
-
                     
-
                     await new Promise((resolve, reject) => {
-
                         const timeout = setTimeout(() => {
-
                             reject(new Error('Block timeout'));
-
                         }, 3000);
-
                         
-
                         userRef.update({
-
                             status: 'blocked',
-
                             blockedReason: 'Device limit exceeded',
-
                             blockedAt: Date.now(),
-
                             updatedAt: Date.now()
-
                         })
-
                         .then(() => {
-
                             clearTimeout(timeout);
-
                             resolve();
-
                         })
-
                         .catch((error) => {
-
                             clearTimeout(timeout);
-
                             reject(error);
-
                         });
-
                     });
-
                     
-
                     console.log('🚫 License auto-blocked due to device limit exceed');
-
                     return; // Don't add device, license is now blocked
-
                 }
-
                 
-
                 // Add new device (within limit)
-
                 devices.push({
-
                     ...deviceInfo,
-
                     connectedAt: Date.now(),
-
                     lastVerified: Date.now()
-
                 });
-
                 console.log(`➕ New device added to database (${devices.length}${deviceLimit ? `/${deviceLimit}` : ''} devices)`);
-
             }
 
             // Update in Firebase (non-blocking with timeout)
-
             await new Promise((resolve, reject) => {
-
                 const timeout = setTimeout(() => {
-
                     reject(new Error('Update timeout'));
-
                 }, 3000);
-
                 
-
                 userRef.update({
-
                     devices: devices,
-
                     updatedAt: Date.now()
-
                 })
-
                 .then(() => {
-
                     clearTimeout(timeout);
-
                     resolve();
-
                 })
-
                 .catch((error) => {
-
                     clearTimeout(timeout);
-
                     reject(error);
-
                 });
-
             });
 
             console.log('✅ Device tracked successfully');
-
         } catch (error) {
-
             console.error('Device tracking error (non-critical):', error);
-
             // Don't throw - device tracking is not critical for verification
-
             // This allows verification to complete even if device tracking fails
-
         }
-
     };
 
     // Show notification when license is revoked
-
     const showNotification = (message) => {
-
         // Create a simple notification banner
-
         const notification = document.createElement('div');
-
         notification.style.cssText = `
-
             position: fixed;
-
             top: 20px;
-
             right: 20px;
-
             background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
-
             color: white;
-
             padding: 16px 24px;
-
             border-radius: 8px;
-
             box-shadow: 0 8px 20px rgba(239, 68, 68, 0.4);
-
             z-index: 100000;
-
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-
             font-weight: 500;
-
             animation: slideIn 0.3s ease;
-
             max-width: 400px;
-
         `;
-
         notification.textContent = message;
-
         
-
         const style = document.createElement('style');
-
         style.textContent = `
-
             @keyframes slideIn {
-
                 from {
-
                     transform: translateX(400px);
-
                     opacity: 0;
-
                 }
-
                 to {
-
                     transform: translateX(0);
-
                     opacity: 1;
-
                 }
-
             }
-
         `;
-
         document.head.appendChild(style);
-
         document.body.appendChild(notification);
-
         
-
         // Auto remove after 5 seconds
-
         setTimeout(() => {
-
             notification.style.animation = 'slideIn 0.3s ease reverse';
-
             setTimeout(() => notification.remove(), 300);
-
         }, 5000);
-
     };
 
     // Check if license is already verified
-
     const checkVerifiedLicense = async () => {
-
         const verified = getVerifiedLicense();
-
         if (!verified) {
-
             return false;
-
         }
 
         try {
-
             // Fast verify the cached license
-
             const { foundUser } = await fastVerifyLicense(verified.licenseKey);
-
             
-
             if (foundUser && foundUser.status === 'active') {
-
                 // License is still valid
-
                 console.log('✅ License already verified - access granted');
-
                 startLicenseMonitoring(verified.licenseKey);
-
                 return true;
-
             } else {
-
                 // License is invalid now
-
                 clearVerifiedLicense();
-
                 return false;
-
             }
-
         } catch (error) {
-
             console.error('License check error:', error);
-
             clearVerifiedLicense();
-
             return false;
-
         }
-
     };
 
     // Auto-format license key as user types
-
     const setupAutoFormat = () => {
-
         const input = document.getElementById('licenseKeyInput');
-
         if (input) {
-
             input.addEventListener('input', (e) => {
-
                 let value = e.target.value.replace(/[^A-Z0-9]/gi, '').toUpperCase();
-
                 if (value.length > 16) value = value.slice(0, 16);
-
                 e.target.value = formatLicenseKey(value);
-
             });
 
             // Allow paste
-
             input.addEventListener('paste', (e) => {
-
                 setTimeout(() => {
-
                     let value = input.value.replace(/[^A-Z0-9]/gi, '').toUpperCase();
-
                     if (value.length > 16) value = value.slice(0, 16);
-
                     input.value = formatLicenseKey(value);
-
                 }, 10);
-
             });
-
         }
-
     };
 
     // Initialize
-
     const init = async () => {
-
         injectStyles();
-
+        // Load Font Awesome for Telegram icon
+        await loadFontAwesome();
         
-
         // Check if license is already verified
-
         const isVerified = await checkVerifiedLicense();
-
         
-
         if (!isVerified) {
-
             // Show panel if not verified
-
             createPanel();
-
             setTimeout(setupAutoFormat, 100);
-
         } else {
-
             console.log('✅ License already verified - panel not shown');
-
             console.log('💡 To verify again, clear localStorage: localStorage.clear()');
-
         }
-
     };
 
     // Make clear function available globally for testing
-
     window.clearLicenseVerification = () => {
-
         clearVerifiedLicense();
-
         if (licenseListener) {
-
             licenseListener();
-
             licenseListener = null;
-
         }
-
         console.log('✅ License verification cleared. Reload page to verify again.');
-
     };
 
     // Start initialization
-
     init();
 
     console.log('✅ License Verification Panel loaded!');
-
     console.log('💡 Use window.clearLicenseVerification() to clear verification');
-
 })();
-
-
 
